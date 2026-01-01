@@ -8,12 +8,12 @@ This project demonstrates a complete robotics learning pipeline using the **ACT 
 
 | Phase | Video | Description |
 |-------|-------|-------------|
-| **Phase 1** | [Expert Demo](#) | Scripted expert policy successfully picking and placing |
-| **Phase 1** | [Random Policy](#) | Untrained arm moving randomly (baseline) |
-| **Phase 1** | [Before Training](#) | Arm at rest / minimal movement |
-| **Phase 2** | [After Training (30k steps)](#) | ACT policy attempting pick-and-place |
+| **Phase 1** | [Expert Demo](https://youtu.be/VuP907sxELQ) | Scripted expert policy successfully picking and placing |
+| **Phase 1** | [Random Policy](https://youtu.be/IaS8G5BYmAQ) | Untrained arm moving randomly (baseline) |
+| **Phase 1** | [Before Training](https://youtu.be/tw9J1FFLFPs) | Arm at rest / minimal movement |
+| **Phase 2** | [After Training (30k steps)](https://youtu.be/ULep7-XoTZM) | ACT policy attempting pick-and-place |
 
-> 📝 *Replace `#` with your YouTube video links after uploading*
+> 📝 *Videos hosted on YouTube*
 
 ---
 
@@ -26,8 +26,8 @@ This project demonstrates a complete robotics learning pipeline using the **ACT 
 │   PHASE 1       │     │   PHASE 2       │     │   PHASE 3       │
 │  Data Collection│────▶│    Training     │────▶│   Deployment    │
 │                 │     │                 │     │                 │
-│ • MuJoCo sim    │     │ • ACT policy    │     │ • Real robot    │
-│ • 50 episodes   │     │ • 30k steps     │     │ • Sim-to-real   │
+│ • MuJoCo sim    │     │ • ACT policy    │     │ • Sim deploy    │
+│ • 50 episodes   │     │ • 30k steps     │     │ • Evaluation    │
 │ • Expert demos  │     │ • LeRobot       │     │ • Coming soon   │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
 ```
