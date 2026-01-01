@@ -18,7 +18,6 @@ dependencies = [
   "tqdm",
   "opencv-python",
   "pyquaternion",
-  "trossen_arm",
 ]
 
 [build-system]

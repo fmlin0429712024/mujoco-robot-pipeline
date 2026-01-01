@@ -255,6 +255,112 @@ class TransferCubeEETask(TrossenAIStationaryEETask):
         return reward
 
 
+
+class OneArmPickPlaceEETask(TrossenAIStationaryEETask):
+    """
+    A task where the right arm picks up a cube and places it into a bucket.
+    """
+
+    def __init__(
+        self,
+        random: int | None = None,
+        onscreen_render: bool = False,
+        cam_list: list[str] = [],
+    ):
+        if not cam_list:
+            cam_list = ["cam_high", "cam_low", "cam_right_wrist"]
+        super().__init__(
+            random=random,
+            onscreen_render=onscreen_render,
+            cam_list=cam_list,
+        )
+        self.max_reward = 4
+
+    def initialize_robots(self, physics: Physics) -> None:
+        # Initialize right arm (which is now the only arm, indices 0-7)
+        # We use the right arm configuration from START_ARM_POSE (indices 8-16 of the bimanual config)
+        right_arm_pose = START_ARM_POSE[8:16]
+        physics.named.data.qpos[:8] = right_arm_pose
+
+        # Reset mocap (only one mocap body for right arm)
+        np.copyto(physics.data.mocap_pos[0], [0.19657, -0.019, 0.25021])
+        np.copyto(physics.data.mocap_quat[0], [1, 0, 0, 0])
+
+    def initialize_episode(self, physics: Physics) -> None:
+        self.initialize_robots(physics)
+        # randomize box position
+        cube_pose = sample_box_pose()
+        # In single arm setup, box joint starts after 8 arm joints
+        # But safer to look it up
+        box_start_idx = physics.model.name2id("red_box_joint", "joint")
+        np.copyto(physics.data.qpos[box_start_idx : box_start_idx + 7], cube_pose)
+
+        # Call grandparent initialize_episode (skipping TrossenAIStationaryEETask's empty one if needed, but calling super is fine)
+        super(TrossenAIStationaryEETask, self).initialize_episode(physics)
+
+    def before_step(self, action: np.ndarray, physics: Physics) -> None:
+        # action is 8 dims: [xyz(3), quat(4), gripper(1)]
+        np.copyto(physics.data.mocap_pos[0], action[:3])
+        np.copyto(physics.data.mocap_quat[0], action[3:7])
+        # Right gripper joints are at indices 6 and 7 of the arm
+        physics.data.qpos[6] = action[7]
+        physics.data.qpos[7] = action[7]
+
+    def get_position(self, physics: Physics) -> np.ndarray:
+        positions = physics.data.qpos.copy()
+        return positions[:8]
+
+    def get_velocity(self, physics: Physics) -> np.ndarray:
+        velocities = physics.data.qvel.copy()
+        return velocities[:8]
+
+    def get_observation(self, physics: Physics) -> dict:
+        obs = get_observation_base(physics, self.cam_list)
+        obs["qpos"] = self.get_position(physics)
+        obs["qvel"] = self.get_velocity(physics)
+        obs["env_state"] = self.get_env_state(physics)
+        obs["mocap_pose_right"] = np.concatenate(
+            [physics.data.mocap_pos[0], physics.data.mocap_quat[0]]
+        ).copy()
+        # No left mocap
+        obs["gripper_ctrl"] = physics.data.ctrl.copy()
+        return obs
+
+    def get_env_state(self, physics: Physics) -> np.ndarray:
+        # Env state is Box pose. Box starts after 8 arm joints.
+        return physics.data.qpos.copy()[8:]
+
+    def get_reward(self, physics: Physics) -> int:
+        # Box pose
+        box_start_idx = physics.model.name2id("red_box_joint", "joint")
+        box_pos = physics.data.qpos[box_start_idx : box_start_idx + 3]
+
+        # Check contact
+        all_contact_pairs = []
+        for i_contact in range(physics.data.ncon):
+            id_geom_1 = physics.data.contact[i_contact].geom1
+            id_geom_2 = physics.data.contact[i_contact].geom2
+            name_geom_1 = physics.model.id2name(id_geom_1, "geom")
+            name_geom_2 = physics.model.id2name(id_geom_2, "geom")
+            all_contact_pairs.append({name_geom_1, name_geom_2})
+
+        touch_right_gripper = any({"red_box", "right/gripper_follower_left"} <= pair or {"red_box", "right/gripper_follower_right"} <= pair for pair in all_contact_pairs)
+
+        # Bucket location: [-0.2, 0, 0]
+        # Check if box is within bounds of bucket
+        in_bucket_xy = np.linalg.norm(box_pos[:2] - np.array([-0.2, 0])) < 0.05
+        
+        reward = 0
+        if touch_right_gripper:
+            reward = 1
+        if touch_right_gripper and box_pos[2] > 0.05:
+            reward = 2 # lifted
+        if not touch_right_gripper and in_bucket_xy and box_pos[2] < 0.1:
+            reward = 4 # Success
+
+        return reward
+
+
 def test_ee_sim_env():
     onscreen_render = True
     cam_list = ["cam_high", "cam_low", "cam_left_wrist", "cam_right_wrist"]

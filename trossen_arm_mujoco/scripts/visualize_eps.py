@@ -34,6 +34,11 @@ import cv2
 import h5py
 import numpy as np
 
+import sys
+
+# Add project root to sys.path to ensure local imports work
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+
 from trossen_arm_mujoco.constants import ROOT_DIR
 
 
@@ -77,7 +82,7 @@ def save_videos(image_dict: dict, dt: float, video_path: str) -> None:
     # Initialize video writer
     out = cv2.VideoWriter(
         video_path,
-        cv2.VideoWriter_fourcc(*"mp4v"),
+        cv2.VideoWriter_fourcc(*"avc1"),
         fps,
         (w_total, h),
     )

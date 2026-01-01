@@ -307,6 +307,155 @@ class PickAndTransferPolicy(BasePolicy):
         ]
 
 
+class PickAndPlacePolicy(BasePolicy):
+    """Policy for picking up a cube and placing it into a bucket using the right arm."""
+
+    def generate_trajectory(self, ts_first: TimeStep):
+        """
+        Generates a predefined trajectory for the pick-and-place task.
+        """
+        init_mocap_pose_right = ts_first.observation["mocap_pose_right"]
+        # No left mocap
+
+        box_info = np.array(ts_first.observation["env_state"])
+        box_xyz = box_info[:3]
+        print(f"Generate trajectory for {box_xyz=}")
+
+        # Gripper orientation facing down (or slightly angled if needed, but lets assume down-ish)
+        # Using existing logic:
+        gripper_pick_quat = Quaternion(init_mocap_pose_right[3:])
+        gripper_pick_quat = gripper_pick_quat * Quaternion(
+            axis=[0.0, 1.0, 0.0], degrees=-45
+        ) # This might rotate it to face forward/down. 
+        # Actually in PickAndTransferPolicy it uses -45 degrees.
+        # Let's trust the existing orientation logic for 'picking'.
+        
+        # Bucket location: [-0.2, 0.0, 0.1ish] top
+        bucket_xyz = np.array([-0.2, 0.0, 0.2]) # High enough to clear edges
+
+        # Dummy left trajectory (needed by BasePolicy logic or modify BasePolicy?)
+        # BasePolicy expects self.left_trajectory and self.right_trajectory.
+        # BasePolicy.__call__ : 
+        # if self.left_trajectory[0]["t"] == self.step_count:
+        #    ...
+        # So I MUST provide left_trajectory or Override __call__.
+        # I'll override __call__ to handle single arm, OR just provide a dummy left trajectory that does nothing?
+        # But BasePolicy returns concatenated action.
+        # If I change __call__, I break compatibility if I don't handle it carefully.
+        # HOWEVER, the Task expects 8-dim action. BasePolicy returns 8+8=16 dim.
+        # So I SHOULD override __call__ to return only 8 dim action.
+        
+        # Override __call__ in this subclass?
+        # Yes.
+    
+        self.right_trajectory = [
+            {
+                "t": 0,
+                "xyz": init_mocap_pose_right[:3],
+                "quat": init_mocap_pose_right[3:],
+                "gripper": 0,
+            },  # sleep
+            {
+                "t": 5,
+                "xyz": init_mocap_pose_right[:3],
+                "quat": init_mocap_pose_right[3:],
+                "gripper": 0.044,
+            },  # open gripper
+            {
+                "t": 80,
+                "xyz": box_xyz + np.array([0, 0, 0.2]),
+                "quat": gripper_pick_quat.elements,
+                "gripper": 0.044,
+            },  # approach the cube
+            {
+                "t": 120,
+                "xyz": box_xyz + np.array([0, 0, 0.2]),
+                "quat": gripper_pick_quat.elements,
+                "gripper": 0.044,
+            },  # stay
+            {
+                "t": 160,
+                "xyz": box_xyz + np.array([0, 0, 0.05]),
+                "quat": gripper_pick_quat.elements,
+                "gripper": 0.044,
+            },  # descend
+            {
+                "t": 200,
+                "xyz": box_xyz + np.array([0, 0, 0.02]),
+                "quat": gripper_pick_quat.elements,
+                "gripper": 0.044,
+            },  # descend
+            {
+                "t": 220,
+                "xyz": box_xyz + np.array([0, 0, 0]),
+                "quat": gripper_pick_quat.elements,
+                "gripper": 0.044,
+            },  # touch
+            {
+                "t": 240,
+                "xyz": box_xyz + np.array([0, 0, 0]),
+                "quat": gripper_pick_quat.elements,
+                "gripper": 0.012,
+            },  # close gripper
+            {
+                "t": 280,
+                "xyz": box_xyz + np.array([0, 0, 0]),
+                "quat": gripper_pick_quat.elements,
+                "gripper": 0.012,
+            },  # secure grasp
+            {
+                "t": 320,
+                "xyz": box_xyz + np.array([0, 0, 0.2]),
+                "quat": gripper_pick_quat.elements,
+                "gripper": 0.012,
+            },  # lift
+            {
+                "t": 400,
+                "xyz": bucket_xyz,
+                "quat": gripper_pick_quat.elements,
+                "gripper": 0.012,
+            },  # move to bucket
+            {
+                "t": 450,
+                "xyz": bucket_xyz,
+                "quat": gripper_pick_quat.elements,
+                "gripper": 0.044,
+            },  # drop
+             {
+                "t": 500,
+                "xyz": bucket_xyz,
+                "quat": gripper_pick_quat.elements,
+                "gripper": 0.044,
+            },  # stay
+        ]
+
+    def __call__(self, ts: TimeStep) -> np.ndarray:
+        if self.step_count == 0:
+            self.generate_trajectory(ts)
+
+        if len(self.right_trajectory) > 0 and self.right_trajectory[0]["t"] == self.step_count:
+            self.curr_right_waypoint = self.right_trajectory.pop(0)
+
+        if len(self.right_trajectory) == 0:
+            # End of trajectory, stay at current waypoint
+            right_xyz = self.curr_right_waypoint["xyz"]
+            right_quat = self.curr_right_waypoint["quat"]
+            right_gripper = self.curr_right_waypoint["gripper"]
+        else:
+            next_right_waypoint = self.right_trajectory[0]
+            right_xyz, right_quat, right_gripper = self.interpolate(
+                self.curr_right_waypoint, next_right_waypoint, self.step_count
+            )
+
+        if self.inject_noise:
+            scale = 0.01
+            right_xyz = right_xyz + np.random.uniform(-scale, scale, right_xyz.shape)
+
+        action_right = np.concatenate([right_xyz, right_quat, [right_gripper]])
+        self.step_count += 1
+        return action_right
+
+
 def test_policy(
     task_name: str,
     num_episodes: int = 2,

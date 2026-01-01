@@ -85,6 +85,7 @@ def make_sim_env(
     task_name: str = "sim_transfer_cube",
     onscreen_render: bool = False,
     cam_list: list[str] = [],
+    random: bool = False,
 ):
     """
     Create a simulated environment for bimanual robotic manipulation.
@@ -100,7 +101,16 @@ def make_sim_env(
         assets_path = os.path.join(ASSETS_DIR, xml_file)
         physics = mujoco.Physics.from_xml_path(assets_path)
         task = task_class(
-            random=False,
+            random=random,
+            onscreen_render=onscreen_render,
+            cam_list=cam_list,
+        )
+    elif "sim_pick_place" in task_name:
+        # Use the provided xml_file (sim_env uses joint xml, ee_env uses scene xml)
+        assets_path = os.path.join(ASSETS_DIR, xml_file)
+        physics = mujoco.Physics.from_xml_path(assets_path)
+        task = task_class(
+            random=random,
             onscreen_render=onscreen_render,
             cam_list=cam_list,
         )

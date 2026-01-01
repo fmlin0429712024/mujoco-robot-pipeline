@@ -42,6 +42,13 @@ SIM_TASK_CONFIGS = {
         "onscreen_render": False,
         "inject_noise": False,
         "cam_names": ["cam_high", "cam_low", "cam_left_wrist", "cam_right_wrist"],
+    },
+    "sim_pick_place": {
+        "num_episodes": 1,
+        "episode_len": 600,
+        "onscreen_render": False,
+        "inject_noise": False,
+        "cam_names": ["cam_high", "cam_low", "cam_right_wrist"],
     }
 }
 

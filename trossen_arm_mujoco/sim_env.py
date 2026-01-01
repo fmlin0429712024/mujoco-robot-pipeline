@@ -38,6 +38,7 @@ from trossen_arm_mujoco.utils import (
     get_observation_base,
     make_sim_env,
     plot_observation_images,
+    sample_box_pose,
 )
 
 
@@ -241,6 +242,86 @@ class TransferCubeTask(TrossenAIStationaryTask):
         # successful transfer
         if touch_left_gripper and not touch_table:
             reward = 4
+        return reward
+
+
+
+class OneArmPickPlaceTask(TrossenAIStationaryTask):
+    """
+    A task where the right arm picks up a cube and places it into a bucket (Joint Control).
+    """
+
+    def __init__(
+        self,
+        random: int | None = None,
+        onscreen_render: bool = False,
+        cam_list: list[str] = [],
+    ):
+        if not cam_list:
+            cam_list = ["cam_high", "cam_low", "cam_right_wrist"]
+        super().__init__(
+            random=random,
+            onscreen_render=onscreen_render,
+            cam_list=cam_list,
+        )
+        self.max_reward = 4
+
+    def before_step(self, action: np.ndarray, physics: Physics) -> None:
+        # Action is 8-dim (6 joints + 2 gripper actuators)
+        # We bypass TrossenAIStationaryTask.before_step which assumes bimanual 14-dim action structure
+        # base.Task.before_step simply sets physics.data.ctrl[:] = action
+        base.Task.before_step(self, action, physics)
+
+    def initialize_episode(self, physics: Physics) -> None:
+        with physics.reset_context():
+            # Set right arm pose (8 dims)
+            right_arm_pose = START_ARM_POSE[8:16]
+            physics.named.data.qpos[:8] = right_arm_pose
+            
+            # Use sample_box_pose to support randomization (synced via seed)
+            cube_pose = sample_box_pose()
+            physics.named.data.qpos[8:15] = cube_pose
+
+        super(TrossenAIStationaryTask, self).initialize_episode(physics)
+
+    def get_position(self, physics: Physics) -> np.ndarray:
+        position = physics.data.qpos.copy()
+        return position[:8]
+
+    def get_velocity(self, physics: Physics) -> np.ndarray:
+        velocity = physics.data.qvel.copy()
+        return velocity[:8]
+
+    def get_env_state(self, physics: Physics) -> np.ndarray:
+        # Box is after 8 joints
+        return physics.data.qpos.copy()[8:]
+
+    def get_reward(self, physics: Physics) -> int:
+        # Same reward logic as EE task
+        # Box pose
+        box_start_idx = physics.model.name2id("red_box_joint", "joint")
+        box_pos = physics.data.qpos[box_start_idx : box_start_idx + 3]
+
+        all_contact_pairs = []
+        for i_contact in range(physics.data.ncon):
+            id_geom_1 = physics.data.contact[i_contact].geom1
+            id_geom_2 = physics.data.contact[i_contact].geom2
+            name_geom_1 = physics.model.id2name(id_geom_1, "geom")
+            name_geom_2 = physics.model.id2name(id_geom_2, "geom")
+            all_contact_pairs.append({name_geom_1, name_geom_2})
+
+        touch_right_gripper = any({"red_box", "right/gripper_follower_left"} <= pair or {"red_box", "right/gripper_follower_right"} <= pair for pair in all_contact_pairs)
+
+        in_bucket_xy = np.linalg.norm(box_pos[:2] - np.array([-0.2, 0])) < 0.05
+        
+        reward = 0
+        if touch_right_gripper:
+            reward = 1
+        if touch_right_gripper and box_pos[2] > 0.05:
+            reward = 2 # lifted
+        if not touch_right_gripper and in_bucket_xy and box_pos[2] < 0.1:
+            reward = 4 # Success
+
         return reward
 
 

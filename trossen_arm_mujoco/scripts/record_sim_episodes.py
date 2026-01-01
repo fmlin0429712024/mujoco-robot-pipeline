@@ -28,7 +28,11 @@
 
 import argparse
 import os
+import sys
 import time
+
+# Add project root to sys.path to ensure local imports work
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 import h5py
 import matplotlib.pyplot as plt
@@ -36,9 +40,9 @@ import numpy as np
 from tqdm import tqdm
 
 from trossen_arm_mujoco.constants import ROOT_DIR, SIM_TASK_CONFIGS
-from trossen_arm_mujoco.ee_sim_env import TransferCubeEETask
-from trossen_arm_mujoco.scripted_policy import PickAndTransferPolicy
-from trossen_arm_mujoco.sim_env import BOX_POSE, TransferCubeTask
+from trossen_arm_mujoco.ee_sim_env import OneArmPickPlaceEETask, TransferCubeEETask
+from trossen_arm_mujoco.scripted_policy import PickAndPlacePolicy, PickAndTransferPolicy
+from trossen_arm_mujoco.sim_env import BOX_POSE, OneArmPickPlaceTask, TransferCubeTask
 from trossen_arm_mujoco.utils import (
     make_sim_env,
     plot_observation_images,
@@ -86,18 +90,36 @@ def main(args):
     if not os.path.exists(hdf5_save_dir):
         os.makedirs(hdf5_save_dir)
 
-    policy_cls = PickAndTransferPolicy
+    if args.task_name == "sim_pick_place":
+        policy_cls = PickAndPlacePolicy
+        ee_task_cls = OneArmPickPlaceEETask
+        sim_task_cls = OneArmPickPlaceTask
+        scene_xml = "trossen_one_arm_scene.xml"
+        scene_joint_xml = "trossen_one_arm_scene_joint.xml"
+    else:
+        policy_cls = PickAndTransferPolicy
+        ee_task_cls = TransferCubeEETask
+        sim_task_cls = TransferCubeTask
+        scene_xml = "trossen_ai_scene.xml"
+        scene_joint_xml = "trossen_ai_scene_joint.xml"
 
     success = []
-    for episode_idx in range(num_episodes):
-        print(f"Episode {episode_idx + 1}/{num_episodes}")
+    start_idx = args.start_episode_idx
+    success = []
+    for i in range(num_episodes):
+        episode_idx = start_idx + i
+        print(f"Episode {episode_idx} (Sequence {i+1}/{num_episodes})")
+        # Sync seed for generation environment
+        np.random.seed(episode_idx)
+        
         # setup the environment
         env = make_sim_env(
-            TransferCubeEETask,
-            "trossen_ai_scene.xml",
-            args.task_name,
+            task_class=ee_task_cls,
+            xml_file=scene_xml,
+            task_name=args.task_name,
             onscreen_render=onscreen_render,
             cam_list=cam_list,
+            random=True,
         )
         ts = env.reset()
         episode = [ts]
@@ -129,12 +151,23 @@ def main(args):
         del episode
         del policy
 
+        # Re-seed to ensure same box position if using random sampling
+        np.random.seed(episode_idx)
+        
         # setup the environment
         print("Replaying joint commands")
         env = make_sim_env(
-            TransferCubeTask,
-            "trossen_ai_scene_joint.xml",
+            task_class=sim_task_cls,
+            xml_file=scene_joint_xml,
+            task_name=args.task_name, # pass task name for logic inside make_sim_env if needed?
+            # make_sim_env(task_class, xml, task_name...)
+            # We updated make_sim_env logic to handle "sim_pick_place".
+            # But the args signature is: (task_class, xml_file, task_name, ...).
+            # Wait, `make_sim_env` definition:
+            # def make_sim_env(task_class, xml_file, task_name, onscreen_render, cam_list):
+            onscreen_render=onscreen_render, # Replay also supports rendering? Yes.
             cam_list=cam_list,
+            random=True, # Added random=True
         )
         BOX_POSE[0] = (
             subtask_info  # make sure the sim_env has the same object configurations as ee_sim_env
@@ -142,7 +175,8 @@ def main(args):
         ts = env.reset()
         episode_replay = [ts]
         # setup plotting
-        plt_imgs = plot_observation_images(ts.observation, cam_list)
+        if onscreen_render:
+            plt_imgs = plot_observation_images(ts.observation, cam_list)
 
         for t in tqdm(
             range(len(joint_traj))
@@ -161,22 +195,13 @@ def main(args):
             success.append(0)
             print(f"{episode_idx=} Failed")
 
-        plt.close()
-
-        """
-        For each timestep:
-        observations
-        - images
-            - each_cam_name     (480, 640, 3) 'uint8'
-        - qpos                  (14,)         'float64'
-        - qvel                  (14,)         'float64'
-
-        action                  (14,)         'float64'
-        """
+        if onscreen_render:
+            plt.close()
 
         data_dict = {
             "/observations/qpos": [],
             "/observations/qvel": [],
+            "/observations/env_state": [],
             "/action": [],
         }
         for cam_name in cam_list:
@@ -190,11 +215,23 @@ def main(args):
         # len(joint_traj) i.e. actions: max_timesteps
         # len(episode_replay) i.e. time steps: max_timesteps + 1
         max_timesteps = len(joint_traj)
-        while joint_traj:
-            action = joint_traj.pop(0)
+        
+        # Determine qpos dimension
+        if max_timesteps > 0:
+            qpos_dim = joint_traj[0].shape[0]
+            # env_state dimension
+            env_state_dim = episode_replay[0].observation["env_state"].shape[0]
+        else:
+            qpos_dim = 16 # fallback
+            env_state_dim = 7 # fallback
+
+        while len(joint_traj) > 1:  # Need at least 2 elements to get action[t] = qpos[t+1]
+            current_qpos = joint_traj.pop(0)
+            action = joint_traj[0]  # Action = next qpos (target position to reach)
             ts = episode_replay.pop(0)
             data_dict["/observations/qpos"].append(ts.observation["qpos"])
             data_dict["/observations/qvel"].append(ts.observation["qvel"])
+            data_dict["/observations/env_state"].append(ts.observation["env_state"])
             data_dict["/action"].append(action)
             for cam_name in cam_list:
                 data_dict[f"/observations/images/{cam_name}"].append(
@@ -203,6 +240,8 @@ def main(args):
 
         # HDF5
         t0 = time.time()
+        # Calculate max_timesteps from actual data collected
+        max_timesteps = len(data_dict["/action"])
         dataset_path = os.path.join(hdf5_save_dir, f"episode_{episode_idx}")
         with h5py.File(dataset_path + ".hdf5", "w", rdcc_nbytes=1024**2 * 2) as root:
             root.attrs["sim"] = True
@@ -215,9 +254,10 @@ def main(args):
                     dtype="uint8",
                     chunks=(1, 480, 640, 3),
                 )
-            _ = obs.create_dataset("qpos", (max_timesteps, 16))
-            _ = obs.create_dataset("qvel", (max_timesteps, 16))
-            action = root.create_dataset("action", (max_timesteps, 16))
+            _ = obs.create_dataset("qpos", (max_timesteps, qpos_dim))
+            _ = obs.create_dataset("qvel", (max_timesteps, qpos_dim))
+            _ = obs.create_dataset("env_state", (max_timesteps, env_state_dim))
+            action = root.create_dataset("action", (max_timesteps, qpos_dim))
 
             for name, array in data_dict.items():
                 root[name][...] = array
@@ -273,6 +313,12 @@ if __name__ == "__main__":
         "--cam_names",
         type=str,
         help="Comma-separated list of camera names.",
+    )
+    parser.add_argument(
+        "--start_episode_idx",
+        type=int,
+        default=0,
+        help="Starting index for episode numbering (useful for appending).",
     )
 
     args = parser.parse_args()
