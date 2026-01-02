@@ -34,6 +34,8 @@ This project demonstrates a complete robotics learning pipeline using the **ACT 
 
 > 💡 **Next Step:** Interested in Isaac Sim for real robot deployment? See [MuJoCo vs Isaac Sim Comparison](docs/mujoco_vs_isaac_sim.md)
 
+> 📐 **For Developers:** See [System Design Document](docs/SYSTEM_DESIGN.md) for complete architecture, data flow, and identified gaps/improvements
+
 ---
 
 ## 📁 Project Structure
