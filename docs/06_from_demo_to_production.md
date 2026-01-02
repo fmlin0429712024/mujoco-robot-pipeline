@@ -454,9 +454,13 @@ You've completed the full learning journey!
 
 ---
 
-## ADVANCED: Cloud-Native Robotics Architecture
+---
 
-> **⚠️ Advanced Topic:** For hyper-scale deployments (1,000+ robots). Skip if you're still learning or deploying <100 robots.
+## PART 2: Cloud-Scale Production (Advanced)
+
+> **⚠️ Optional Reading:** For hyper-scale deployments (1,000+ robots). Skip if you're still learning or deploying <100 robots.
+
+### **Topic: Cloud-Native Robotics Architecture**
 
 ### **The Next Frontier: Isaac Sim on Kubernetes (GCP)**
 
@@ -475,6 +479,7 @@ GCP Kubernetes (GKE)
     ├─▶ Isaac Lab containers (4,096 parallel envs)
     ├─▶ Nucleus (Digital Twin asset hub)
     ├─▶ SDG (Synthetic Data Generation)
+    ├─▶ ROS 2 (Orchestration & communication)
     └─▶ Triton Inference (Model serving)
     
 Automated CI/CD:
@@ -493,6 +498,8 @@ Automated CI/CD:
 **Nucleus:** NVIDIA's digital twin asset server - stores 3D models, shares across team/fleet
 
 **Synthetic Data Gen (SDG):** Automated pipeline generating labeled training data (e.g., 1M images overnight)
+
+**ROS 2:** Middleware orchestrating all components - handles messaging, node management, deployment coordination
 
 **Triton Inference Server:** High-performance model serving (ACT, YOLO, GR00T) to fleet
 
