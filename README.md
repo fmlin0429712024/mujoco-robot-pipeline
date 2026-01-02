@@ -80,6 +80,12 @@ This project demonstrates a complete robotics learning pipeline using the **ACT 
    - Migration from prototype to production
    - Your next steps
 
+7. **[06 - From Demo to Production](docs/06_from_demo_to_production.md)** (8 min)
+   - Edge deployment (Jetson, NUC)
+   - Fleet operations (CI/CD, Docker)
+   - Safety engineering & calibration
+   - The gap from demo to 2,000 robots
+
 ---
 
 ## 🎯 Quick Start Options
