@@ -55,14 +55,14 @@ LAYER 1: Simulation          DATA PIPELINE         LEARNING
 
 **Critical design decision:**
 ```python
-# ❌ WRONG: Identity mapping
-action[t] = current_position
+# ❌ WRONG: Identity mapping (80% of beginners make this mistake!)
+action[t] = current_position  # Learns "do nothing"
 
-# ✅ CORRECT: Next position
-action[t] = next_position  # qpos[t+1]
+# ✅ CORRECT: Next position mapping
+action[t] = next_position  # qpos[t+1] - Learns movement
 ```
 
-**Why:**Policy learns state→next_state, not identity function
+**Why this matters:** Policy must learn state→next_state transitions, NOT identity function. This single bug breaks the entire learning pipeline!
 
 ---
 

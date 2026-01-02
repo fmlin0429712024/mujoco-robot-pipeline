@@ -206,6 +206,8 @@ Result: General-purpose AI assistant ✅
 
 **Payback period: Month 4 of Year 1**
 
+**Compute advantage:** Run 4,096 parallel environments on 1 GPU server → 100x faster than real robot testing
+
 ---
 
 ## Competitive Advantage

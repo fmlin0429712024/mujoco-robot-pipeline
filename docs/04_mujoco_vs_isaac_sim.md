@@ -260,6 +260,8 @@ randomize_physics()
 
 **Why it matters:** Vision models need realistic images to transfer to real robots
 
+**Bonus - USD (Universal Scene Description):** Isaac Sim uses OpenUSD, enabling seamless integration with enterprise digital twins and factory-wide simulations
+
 ---
 
 ### **3. Training Pipeline**
@@ -345,6 +347,8 @@ Your Project Goal
 5. **Start with MuJoCo** (learn fast, iterate quickly)
 
 6. **Graduate to Isaac Sim** (when you need to scale)
+
+7. **Advanced: MJX** (MuJoCo on JAX for GPU acceleration) - if you need massive parallelism but want to stay in MuJoCo ecosystem
 
 ---
 

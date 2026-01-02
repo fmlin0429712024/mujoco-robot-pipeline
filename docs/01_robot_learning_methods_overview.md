@@ -49,7 +49,7 @@ Classical Methods          Learning Methods           Hybrid Approach
 
 ### **Imitation Learning (IL)**
 
-**What:** Robot learns by copying expert demonstrations
+**What:** Robot learns by copying expert demonstrations (supervised learning)
 
 **How it works:**
 ```
@@ -72,7 +72,7 @@ Classical Methods          Learning Methods           Hybrid Approach
 
 ### **Reinforcement Learning (RL)**
 
-**What:** Robot discovers strategy through trial and error
+**What:** Robot discovers strategy through trial and error (trial-and-error learning)
 
 **How it works:**
 ```
@@ -136,11 +136,11 @@ Your Robot Task
 
 ## Comparison Table
 
-| Method | Training | Complexity | Safety | Use Case |
-|--------|----------|-----------|--------|----------|
-| **Classical** | None | Low ⭐ | ✅✅✅ | Navigation, known problems |
-| **IL** | Hours-days | Medium ⭐⭐ | ✅✅ | Manipulation, human-like |
-| **RL** | Days-weeks | High ⭐⭐⭐ | ⚠️ | Optimization, discovery |
+| Method | Training | Data Needed | Complexity | Safety | Use Case |
+|--------|----------|-------------|-----------|--------|----------|
+| **Classical** | None | Zero | Low ⭐ | ✅✅✅ | Navigation, known problems |
+| **IL** | Hours-days | Medium (50-500 demos) | Medium ⭐⭐ | ✅✅ | Manipulation, human-like |
+| **RL** | Days-weeks | Huge (millions of attempts) | High ⭐⭐⭐ | ⚠️ | Optimization, discovery |
 
 ---
 
