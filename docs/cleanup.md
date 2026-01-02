@@ -16,7 +16,42 @@ After completing all 3 phases, you'll have accumulated ~30GB+ of data:
 | `visualizations/` | ~27MB | ✅ Keep (your results!) |
 | `training.log` | ~13KB | ✅ Keep (training history) |
 
-**Total space to free:** ~29GB
+**Total space to free:** ~29GB (in project) + **potentially 95GB+ in hidden directories!**
+
+---
+
+## ⚠️ CRITICAL: Check Hidden Directories First!
+
+**Before cleaning the project directory**, check for data stored in hidden home directories:
+
+### Why This Matters
+
+During initial development, recording scripts may save data to **hidden cache directories** outside your project:
+
+| Hidden Directory | Typical Size | What It Contains |
+|-----------------|--------------|------------------|
+| `~/.trossen` | **95GB!** | Old episode recordings (if `--root_dir` not specified) |
+| `~/.cache/huggingface` | ~11MB | Model cache (safe to keep) |
+| `~/.lerobot` | Variable | Old dataset cache |
+
+### Check for Hidden Data
+
+```bash
+# Check if hidden directories exist and their sizes
+du -sh ~/.trossen ~/.lerobot ~/.cache/huggingface 2>/dev/null
+```
+
+### Delete Hidden Cache (if exists)
+
+```bash
+# ⚠️ ONLY if you see large sizes above (e.g., 95GB)
+rm -rf ~/.trossen
+rm -rf ~/.lerobot
+```
+
+**This was the bug:** Early in this project, data was saved to `~/.trossen` instead of `data/raw/` because the `--root_dir` argument wasn't used. This accumulated **95GB** before being discovered!
+
+**Space freed:** Up to **95GB** (if hidden directories existed)
 
 ---
 
