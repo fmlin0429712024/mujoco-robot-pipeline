@@ -1,569 +1,327 @@
-# Robot Learning Journey: From Pick-Place to AMR Navigation
+# Robotics Use Cases and Solutions
 
-> **Summary of key learnings from pick-and-place IL project to understanding robot intelligence methods**
+> **From theory to practice:** See how methods apply to real business problems
 
----
-
-## 1. What We Built: Pick-and-Place with Imitation Learning
-
-### **Project Overview**
-
-**Task:** Teach a 6-DOF robot arm to pick up a red cube and place it in a green bucket
-
-**Method:** Imitation Learning (ACT policy)
-
-**Pipeline:**
-```
-Expert Demos (50 episodes) 
-    → MuJoCo simulation 
-    → LeRobot dataset (447MB)
-    → ACT training (30k steps)
-    → Deployed policy
-```
-
-**Key Results:**
-- ✅ Loss: 4.374 → 0.036 (successful learning)
-- ⚠️ Success rate: 0% (shows intent but needs more data/training)
-- ✅ Complete IL pipeline established
+**Reading time:** 10 minutes
 
 ---
 
-## 2. Core Insights from Pick-Place Project
+## Two Real-World Examples
 
-### **Critical Discoveries**
+This document explores two complete robot systems:
 
-**1. Action Recording Bug**
-```python
-# ❌ WRONG (identity mapping)
-action[t] = current_position
+1. **Nursing Home AMR** - Navigation, perception, 2,000-facility scale
+2. **Pick-Place Demonstration** - Manipulation, imitation learning, this project
 
-# ✅ CORRECT (next position)
-action[t] = next_position  # qpos[t+1]
-```
-**Impact:** Policy learns state→next_state mapping, not identity function
-
-**2. Image Normalization Consistency**
-```python
-# Training and eval MUST match
-image = (image / 255.0 - imagenet_mean) / imagenet_std
-```
-**Impact:** Mismatched preprocessing causes policy failure
-
-**3. Data Format Conversion**
-- HDF5 (26GB) → LeRobot Parquet (447MB)
-- 58x compression via MP4 video encoding
-- Faster training with column-oriented format
-
-**4. Hidden Directory Management**
-- Recording saved to `~/.trossen` (95GB!) before fix
-- Lesson: Always use explicit `--data_dir` arguments
+Both teach different lessons about choosing the right technical approach.
 
 ---
 
-## 3. Understanding Training vs No-Training Methods
+## Use Case 1: Nursing Home AMR
 
-### **The Big Revelation**
+### **Business Context**
 
-**NOT all robotics methods require training!**
-
-| Aspect | Learning Methods | Classical Methods |
-|--------|-----------------|-------------------|
-| **Training needed?** | ✅ Yes (hours to weeks) | ❌ **No training at all!** |
-| **Has model?** | ✅ Yes (neural network) | ❌ No model - just algorithms |
-| **Pipeline?** | Data → Train → Deploy | Write algorithm → Deploy |
-| **Examples** | IL (ACT), RL (PPO) | SLAM, A*, PID control |
-
-**Key insight:** Classical methods are "write once, deploy immediately" - zero training time!
-
----
-
-## 4. Learning Methods Deep Dive
-
-### **Imitation Learning (IL) - What We Used**
-
-**How it works:**
-```
-Expert demonstrates task → Record actions → Train policy to copy expert
-```
-
-**Characteristics:**
-- Needs: Expert demonstrations
-- Training time: Hours to days
-- Data needed: 50-500 episodes
-- Use case: Complex manipulation, human-like behavior
-
-**Our project:** ACT policy learns from scripted expert, pick-and-place task
-
----
-
-### **Reinforcement Learning (RL) - Alternative Approach**
-
-**How it works:**
-```
-Agent explores randomly → Gets rewards → Learns optimal behavior
-```
-
-**Characteristics:**
-- Needs: Reward function (not demonstrations)
-- Training time: Days to weeks (millions of steps)
-- Data needed: Agent-generated (trial & error)
-- Use case: Game playing, optimization, no expert available
-
-**Key difference from IL:** Agent discovers strategy vs copying expert
-
-**Original TrossenRobotics repo:** Designed for RL, but we adapted it for IL
-
----
-
-### **Classical Planning - Most Navigation**
-
-**How it works:**
-```
-Known algorithm (A*, Dijkstra) → Compute path → Execute
-```
-
-**Characteristics:**
-- Needs: Map of environment
-- Training time: **Zero!**
-- Complexity: Low
-- Use case: Navigation, path planning
-
-**Key insight:** Still the best choice for most navigation problems!
-
----
-
-## 5. SLAM: Not a Learning Method!
-
-### **What is SLAM?**
-
-**SLAM = Simultaneous Localization And Mapping**
-
-```
-Robot explores unknown space
-    ↓
-Builds map while tracking position
-    ↓
-No learning - just geometry and probability!
-```
-
-**Common misconception:** SLAM is NOT learning - it's a **mapping technique**
-
-**Use with:** Classical navigation (A* planning on SLAM-built map)
-
----
-
-## 6. Domain Randomization & Isaac Sim
-
-### **What is Domain Randomization?**
-
-**Technique:** Generate diverse training data by randomizing simulation parameters
-
-**Without randomization (MuJoCo - our project):**
-```
-50 episodes with:
-├─▶ Same lighting
-├─▶ Same textures
-├─▶ Only cube position varies
-└─▶ Result: Policy may fail in different environments
-```
-
-**With randomization (Isaac Sim):**
-```
-10,000 episodes with:
-├─▶ Randomized lighting (50 conditions)
-├─▶ Randomized textures (20 materials)
-├─▶ Randomized object positions
-├─▶ Randomized camera angles
-└─▶ Result: Policy robust to real-world variations ✅
-```
-
----
-
-### **Why Isaac Sim for Real Robot Deployment?**
-
-| Feature | MuJoCo (Our Project) | Isaac Sim |
-|---------|---------------------|-----------|
-| **Visual quality** | Simple shapes | Photorealistic (RTX ray tracing) |
-| **Physics** | Basic | PhysX 5 (accurate) |
-| **Domain randomization** | Manual/limited | Built-in, extensive |
-| **Purpose** | Fast prototyping | Sim-to-real transfer |
-| **Target** | Simulation testing | Real robot deployment |
-
-**Our project:** MuJoCo was perfect for learning the pipeline
-**Next step:** Isaac Sim for real robot deployment with robust policies
-
----
-
-## 7. AMR Use Case: Nursing Home Navigation
-
-### **The Business Problem**
-
-**Goal:** Deploy AMR to 2,000 nursing homes for medication/item delivery
+**Goal:** Deploy autonomous mobile robots to 2,000 nursing homes for medication/item delivery
 
 **Requirements:**
-- Navigate different layouts
+- Navigate different layouts (each facility unique)
 - Detect people, wheelchairs, obstacles
 - Work in diverse lighting conditions
-- Voice interaction (SLM)
-- Safety-critical
+- Safety-critical environment
+- Voice interface for nurses
+- Fast deployment (<15 min per facility)
 
 ---
 
-### **Technology Stack Decision**
+### **Technical Architecture**
 
-#### **Navigation: Classical (No Training)**
+#### **Navigation: Classical Methods (No Training)**
 
 ```
-Method: SLAM + A* + AprilTags
+Discovery Run (One-time per facility):
+├─ Robot drives through hallways
+├─ SLAM builds map
+├─ AprilTags provide landmarks
+└─ Saves map (~15 min)
 
-Process:
-1. Install AprilTags on walls (landmarks)
-2. Discovery Run (one-time per facility)
-   └─▶ Robot maps the nursing home
-3. Live Operation
-   └─▶ Classical A* path planning
-   └─▶ SLAM localization with AprilTags
-   
-Training needed: ZERO ✅
+Live Operation:
+├─ Localize using SLAM + AprilTags
+├─ Plan path with A*
+├─ Avoid obstacles with DWA
+└─ Works immediately! ✅
 ```
 
-**Why classical, not RL?**
-- ✅ Reliable and safe (critical for nursing homes)
-- ✅ Works immediately after discovery run
-- ✅ No training time
-- ✅ Interpretable behavior
+**Why classical, not learning?**
+- ✅ Reliable and safe
+- ✅ Works after discovery run (no training)
+- ✅ Interpretable (you understand what it does)
 
 ---
 
-#### **Vision: Domain Randomization + YOLO Training**
+#### **Vision: Learning Required**
 
-**Problem:** 2,000 facilities have different:
+**Challenge:** 2,000 facilities have different:
 - Lighting (fluorescent, natural, LED)
-- Wall colors (white, beige, blue)
-- Floor types (tile, carpet, linoleum)
+- Wall colors (white, beige, blue, pink)
+- Floor types (tile, carpet, wood)
 
-**Solution with Isaac Sim:**
+**Without learning:** Would need to manually collect data at each facility ❌
+
+**With vision learning (YOLO):**
 
 ```
-Step 1: Build Generic Nursing Home Model
-├─▶ Hallways, rooms, furniture (one 3D model)
-
-Step 2: Domain Randomization (Isaac Sim)
-├─▶ Generate 10,000 synthetic images
-├─▶ Randomize: lighting, colors, textures, layouts
-└─▶ Covers all 2,000 real facilities' variations
-
-Step 3: Train YOLO (Object Detection)
-├─▶ Train on 10,000 diverse synthetic images
-├─▶ Learn to detect: person, wheelchair, obstacles
-├─▶ Training time: 1-2 days
-└─▶ Deploy ONCE → Works in all 2,000 centers ✅
+Train once on diverse synthetic data
+    → Works in all 2,000 facilities ✅
 ```
 
-**Why Isaac Sim is justified:**
-- Alternative: Visit 2,000 facilities ($2M+, 10+ years)
-- Isaac Sim: $10K, 2-3 months
-- **ROI: $1,990,000 savings**
+**This is where Isaac Sim becomes critical** (we'll cover this in doc 03)
 
 ---
 
-#### **Voice Interface: SLM (Offline)**
+#### **Voice Interface: Pre-trained + Fine-tuned**
 
 ```
-Method: Fine-tuned Llama/Mistral
+SLM (Small Language Model):
+├─ Base: Llama 3 / Mistral (pre-trained)
+├─ Fine-tune: Nursing-specific conversations
+└─ Deploy: Offline on device
+```
+
+**Not Isaac Sim** - text-based fine-tuning
+
+---
+
+### **AMR Technology Stack**
+
+| Component | Method | Training? | Time |
+|-----------|--------|-----------|------|
+| **Navigation** | SLAM + A* | ❌ No | Discovery run (~15 min) |
+| **Vision** | YOLO | ✅ Yes | Train once (~2 days) |
+| **Voice** | Fine-tuned SLM | ✅ Yes | Fine-tune once (~1 day) |
+| **Motor control** | PID | ❌ No | Instant |
+
+**Key insight:** Hybrid approach - classical where possible, learning where necessary!
+
+---
+
+### **Business Value**
+
+**Old approach (manual data collection):**
+- Visit 2,000 facilities
+- Collect videos, label data
+- Train per-site models
+- Cost: $2,000,000+
+- Time: 10+ years
+
+**Modern approach (sim + classical):**
+- Generate synthetic training data (Isaac Sim)
+- Train vision model once
+- Classical navigation per site
+- Cost: $10,000 (Isaac Sim) + deployment
+- Time: 12-16 months for 2,000 sites
+
+**ROI:** $1,990,000 savings, 10x faster deployment
+
+---
+
+## Use Case 2: Pick-and-Place Demonstration
+
+### **Business Context**
+
+**Goal:** Teach robot arm to pick up cube, place in bucket
+
+**Approach:** Imitation Learning (learn by copying expert demonstrations)
+
+**This is your MuJoCo demo project!**
+
+---
+
+### **Why Imitation Learning?**
+
+**Could we use classical methods?**
+- For simple pick-place: Yes (inverse kinematics + scripted)
+- For variable objects/positions: Becomes very complex
+
+**Could we use RL?**
+- Yes, but would take weeks of training
+- IL works in hours with 50 demonstrations
+
+**Decision:** IL is the sweet spot for manipulation tasks
+
+---
+
+### **Technical Pipeline**
+
+#### **Phase 1: Data Collection**
+
+```
+Expert Policy (Scripted):
+├─ Uses inverse kinematics
+├─ Move → Grasp → Lift → Place
+└─ Perfect demonstrations
+
+Record 50 Episodes:
+├─ Randomized cube positions
+├─ Save images + joint actions
+└─ Convert to LeRobot format (447MB)
+```
+
+**Key:** Domain randomization creates variety in simple simulation
+
+---
+
+#### **Phase 2: Training
+
+**
+
+```
+ACT Policy (Action Chunking Transformers):
+├─ Vision: ResNet-18 encoder
+├─ Action: Transformer decoder
+└─ Outputs: 100-step action sequence
 
 Training:
-├─▶ Pre-trained model (offline)
-├─▶ Fine-tune on nursing-specific conversations
-└─▶ Text-based training (no Isaac Sim needed)
+├─ 30,000 steps (~2-3 hours)
+├─ Loss: 4.374 → 0.036 ✅
+└─ Learns movement patterns
+```
 
-Deployment:
-└─▶ Runs on-device (edge processing, no cloud)
+**Training method:** Fixed 30k steps, no periodic eval (simplicity!)
+
+---
+
+#### **Phase 3: Deployment (Simulation)**
+
+```
+Evaluation:
+├─ Run learned policy 10 times
+├─ Record video
+└─ Measure success rate
+
+Results:
+├─ Loss decreased dramatically ✅
+├─ Shows clear intent to pick ✅
+├─ Success rate: 0% (needs more data/training)
+└─ Proof: Learning pipeline works!
 ```
 
 ---
 
-### **Complete AMR Architecture**
+### **Lessons Learned**
 
-```
-┌────────────────────────────────────────────┐
-│         AMR System Architecture             │
-└────────────────────────────────────────────┘
+**Critical bugs found:**
 
-Layer 1: Navigation (Classical - No Training)
-├─▶ SLAM: Build map during discovery run
-├─▶ Localization: AprilTags + SLAM
-├─▶ Path Planning: A*
-└─▶ Obstacle Avoidance: DWA
+1. **Action recording bug**
+   ```python
+   # ❌ WRONG: Learns identity function
+   action[t] = current_position
+   
+   # ✅ CORRECT: Learns state→next_state
+   action[t] = next_position
+   ```
 
-Layer 2: Perception (Vision Model - Needs Training)
-├─▶ Object Detection: YOLO
-├─▶ Training Data: Isaac Sim domain randomization
-└─▶ Detects: People, wheelchairs, obstacles
+2. **Image normalization mismatch**
+   - Training used ImageNet normalization
+   - Eval initial forgot it → policy failed
+   - Fix: Match preprocessing exactly
 
-Layer 3: Interaction (SLM - Pre-trained + Fine-tuned)
-├─▶ Voice UI: Offline SLM
-└─▶ Commands: "Take to Room 302", etc.
-
-Layer 4: Control (Classical - No Training)
-├─▶ Motor control: PID
-└─▶ Safety stops: Depth sensor + thresholds
-```
+**Takeaway:** Imitation learning works, but details matter!
 
 ---
 
-## 8. Key Decision Framework
+### **Technology Stack**
 
-### **When to Use Each Method**
-
-#### **Use Imitation Learning (IL) When:**
-- ✅ Have expert demonstrations
-- ✅ Complex manipulation tasks
-- ✅ Need human-like behavior
-- **Example:** Your pick-place project
-
-#### **Use Reinforcement Learning (RL) When:**
-- ✅ No expert available
-- ✅ Need to discover optimal strategy
-- ✅ Can afford long training time
-- **Example:** Game playing, novel locomotion
-
-#### **Use Classical Methods When:**
-- ✅ Problem has known solution (navigation)
-- ✅ Safety-critical (nursing homes!)
-- ✅ Need interpretability
-- **Example:** AMR navigation with SLAM + A*
-
-#### **Use Isaac Sim When:**
-- ✅ Scaling to diverse environments (2,000 centers)
-- ✅ Need robust visual perception
-- ✅ Sim-to-real transfer required
-- **Example:** Vision models for AMR
-
-#### **DON'T Use Isaac Sim When:**
-- ❌ Single environment pilot
-- ❌ Basic navigation only
-- ❌ Can use pre-trained models
-- **Example:** Single-facility MVP
+| Component | Framework | Purpose |
+|-----------|-----------|---------|
+| **Simulation** | MuJoCo | Fast physics, prototyping |
+| **Expert policy** | Custom (IK-based) | Generate demonstrations |
+| **Data format** | LeRobot | Standard IL format |
+| **Policy** | ACT (transformers) | Learn from demos |
+| **Training** | PyTorch + LeRobot | 30k steps |
 
 ---
 
-## 9. Common Misconceptions Clarified
+## Comparing the Two Use Cases
 
-| Myth | Reality |
-|------|---------|
-| **"RL is always better than classical"** | ❌ Classical is often simpler and more reliable |
-| **"SLAM is a learning method"** | ❌ SLAM is a mapping algorithm, not learning |
-| **"All robotics needs training"** | ❌ Classical methods need zero training |
-| **"IL and RL need same data"** | ❌ IL needs expert demos, RL generates own data |
-| **"Isaac Sim is for simulation only"** | ❌ Isaac Sim generates training data for real robots |
-| **"Domain randomization is a model"** | ❌ It's a data generation technique |
-| **"Need GPU for all robotics"** | ❌ Classical methods run fine on CPU |
-
----
-
-## 10. Training vs No-Training Summary
-
-### **Methods That NEED Training**
-
-| Method | What Trains | Training Time | Use Case |
-|--------|-------------|---------------|----------|
-| **IL (ACT)** | Neural network policy | Hours-days | Manipulation |
-| **RL (PPO)** | Neural network policy | Days-weeks | Optimization |
-| **Vision (YOLO)** | Object detector | Hours-days | Perception |
-| **SLM** | Language model | Hours (fine-tuning) | Conversation |
-
-**Pipeline:** Data → Train → Deploy
+| Aspect | Nursing AMR | Pick-Place Demo |
+|--------|-------------|-----------------|
+| **Scale** | 2,000 facilities | Research prototype |
+| **Navigation** | Classical (SLAM) | N/A |
+| **Vision** | YOLO (learning) | Part of ACT policy |
+| **Manipulation** | None | ACT (IL) |
+| **Training time** | Vision only (~2 days) | Full pipeline (~3 hours) |
+| **Sim platform** | Isaac Sim (for vision) | MuJoCo (lightweight) |
+| **Business value** | $2M savings, production | Learning the pipeline |
 
 ---
 
-### **Methods With NO Training**
+## Strategic Insights
 
-| Method | What It Is | Deployment | Use Case |
-|--------|-----------|------------|----------|
-| **SLAM** | Geometric algorithm | Instant | Mapping |
-| **A*** | Graph search | Instant | Path planning |
-| **PID** | Control theory | Instant | Motor control |
-| **AprilTags** | Fiducial markers | Instant | Localization |
+### **1. Don't Over-Learn**
 
-**Pipeline:** Code algorithm → Deploy (no training phase!)
+**AMR example:** Uses classical navigation even though RL navigation exists
 
----
+**Why?** Classical is:
+- Faster to deploy
+- More reliable
+- More interpretable
 
-## 11. Your Learning Path Progression
-
-### **Phase 1: MuJoCo Pick-Place (Completed ✅)**
-
-**What you learned:**
-- ✅ Imitation Learning (ACT policy)
-- ✅ Data pipeline (HDF5 → LeRobot)
-- ✅ Training workflow (30k steps)
-- ✅ Debugging (action recording, normalization)
-- ✅ Simulation with MuJoCo
-
-**Skills gained:**
-- End-to-end learning pipeline
-- Data collection & conversion
-- Model training & evaluation
-- Simulation setup
+**Lesson:** Use learning only where necessary
 
 ---
 
-### **Phase 2: Understanding the Landscape (Our Discussion)**
+### **2. Hybrid is Reality**
 
-**What you learned:**
-- ✅ IL vs RL vs Classical methods
-- ✅ SLAM and navigation
-- ✅ Domain randomization concept
-- ✅ Isaac Sim for scaling
-- ✅ Decision framework for method selection
+**Real products combine:**
+- Classical methods (reliability)
+- Learning methods (flexibility)
 
-**Skills gained:**
-- Big picture thinking
-- Technology selection
-- Business case for Isaac Sim
-- Production considerations
+**Pure learning systems are research, not production** (except self-driving cars)
 
 ---
 
-### **Phase 3: Recommended Next Steps**
+### **3. Simulation Matters**
 
-**For AMR Project:**
+**MuJoCo:** Great for learning the pipeline (fast, simple)
 
-**Month 1-2: Isaac Sim Setup**
-- Learn Isaac Sim basics
-- Model generic nursing home
-- Implement domain randomization
+**Isaac Sim:** Required for production (photorealistic, sim-to-real)
 
-**Month 3-4: Vision Model Training**
-- Generate 10,000 synthetic images
-- Train YOLO for person/wheelchair detection
-- Validate on real images
-
-**Month 5-6: Classical Navigation**
-- Implement SLAM (Cartographer)
-- A* path planning
-- AprilTag localization
-
-**Month 7+: Integration & Deployment**
-- Combine vision + navigation
-- Test in pilot facilities
-- Scale to 2,000 centers
+**Both are needed** at different stages
 
 ---
 
-## 12. Resources for Continued Learning
+### **4. Data is the Differentiator**
 
-### **Books**
-- "Probabilistic Robotics" (Thrun) - SLAM & classical methods
-- "Reinforcement Learning: An Introduction" (Sutton & Barto) - RL theory
+**AMR:** Can't scale without synthetic data (Isaac Sim)
 
-### **Courses**
-- ROS 2 Navigation Stack tutorials
-- NVIDIA Isaac Sim tutorials
-- DeepMind RL course
+**Pick-place:** 50 demos sufficient for proof-of-concept
 
-### **Frameworks**
-- **LeRobot** - IL (what you used!)
-- **Stable-Baselines3** - RL
-- **Nav2** - ROS 2 navigation
-- **Isaac Sim** - Photorealistic simulation
-
-### **Communities**
-- LeRobot Discord
-- ROS 2 forums
-- NVIDIA Isaac Sim forums
+**More data always helps**, but quality > quantity
 
 ---
 
-## 13. Final Takeaways
+## What You've Learned
 
-### **Technical Insights**
+From these two use cases:
 
-1. **Start simple:** Classical methods often work - don't assume you need learning
-2. **IL needs experts:** Your scripted policy was the expert for pick-place
-3. **RL needs time:** Millions of steps - only use when necessary
-4. **SLAM ≠ Learning:** It's a classical algorithm
-5. **Domain randomization:** Key to scaling across diverse environments
-6. **Isaac Sim ROI:** Justified for 2,000-center scale, not for single pilot
+✅ **When to use classical** - Navigation, motor control
 
----
+✅ **When to use learning** - Perception, manipulation
 
-### **Business Insights**
+✅ **How to combine them** - Hybrid architecture
 
-1. **MVP approach:** Classical-only for pilot (your AMR)
-2. **Scale approach:** Isaac Sim essential for 2,000 centers
-3. **Training time = cost:** Classical methods save time
-4. **Safety matters:** Classical more predictable for nursing homes
-5. **Data collection:** Isaac Sim saves $2M+ vs real-world collection
+✅ **Why simulation matters** - Scaling, safety, speed
+
+✅ **Business thinking** - ROI, deployment time, reliability
 
 ---
 
-### **Project Success Factors**
+## What's Next?
 
-**Your pick-place project succeeded because:**
-- ✅ Clear task definition
-- ✅ Expert policy (scripted)
-- ✅ Data pipeline (well-designed)
-- ✅ Debugging methodology (systematic)
-- ✅ Documentation (comprehensive)
+You've seen two use cases. Now let's explore **how to scale** the AMR vision approach using Isaac Sim as a platform investment.
 
-**Apply to AMR project:**
-- ✅ Clear requirements (2,000 centers)
-- ✅ Right technology (Isaac Sim for scale)
-- ✅ Hybrid approach (classical + vision learning)
-- ✅ Phased deployment (validate then scale)
+**→ Continue to:** [03 - Isaac Sim Platform Strategy](03_isaac_sim_platform_strategy.md)
 
 ---
 
-## 14. Quick Reference Decision Tree
-
-```
-Q: What's your robot task?
-
-├─▶ Navigation in known space?
-│   └─▶ Use: Classical (SLAM + A*)
-│       └─▶ Training: None
-│
-├─▶ Navigation across 2,000 diverse sites?
-│   └─▶ Use: Classical navigation + YOLO vision
-│       └─▶ Training: YOLO only (Isaac Sim data)
-│
-├─▶ Complex manipulation with expert demos?
-│   └─▶ Use: Imitation Learning (IL/ACT)
-│       └─▶ Training: Hours-days
-│       └─▶ Example: Your pick-place ✅
-│
-├─▶ Need to discover optimal strategy?
-│   └─▶ Use: Reinforcement Learning (RL)
-│       └─▶ Training: Days-weeks
-│
-└─▶ Self-driving level complexity?
-    └─▶ Use: End-to-End Deep Learning
-        └─▶ Training: Weeks-months
-```
-
----
-
-## Conclusion
-
-**What started as a pick-and-place learning project became a comprehensive journey through robot intelligence methods.**
-
-**Key realization:** 
-- Not all robotics needs learning (classical methods are powerful!)
-- When you DO need learning, choose the right method (IL vs RL)
-- Scaling requires smart data generation (Isaac Sim domain randomization)
-- Business constraints drive technology choices (2,000 centers → Isaac Sim justified)
-
-**You now have:**
-- ✅ Working IL pipeline (pick-place project)
-- ✅ Understanding of all major methods (IL, RL, classical)
-- ✅ Decision framework for technology selection
-- ✅ Clear path for AMR project (classical navigation + Isaac vision)
-
-**Next step:** Apply this knowledge to build your 2,000-center AMR system! 🚀
-
----
-
-*Document created: January 2, 2026*
-*Based on: Pick-and-place IL project + extended robotics discussions*
+*Part 2 of 5-part learning journey*
