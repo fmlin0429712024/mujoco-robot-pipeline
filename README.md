@@ -70,6 +70,29 @@ trossen-pick-place/
 
 ## 🚀 Quick Start
 
+### Step-by-Step Guides
+
+Follow these guides to reproduce the complete learning pipeline:
+
+1. **[Phase 1: Data Collection](docs/phase1_data_collection.md)** (~25 min)
+   - Record 50 expert demonstrations
+   - Convert to LeRobot format
+   - Generate expert demo video
+
+2. **[Phase 2: Training](docs/phase2_training.md)** (~2-3 hours)
+   - Generate baseline videos (random & untrained)
+   - Train ACT policy for 30k steps
+   - Monitor training progress
+
+3. **[Phase 3: Deployment](docs/phase3_deployment.md)** (~10 min)
+   - Run trained policy in simulation
+   - Record deployment video
+   - Compare results
+
+4. **[Cleanup](docs/cleanup.md)** (~2 min)
+   - Free ~29GB disk space
+   - Keep only essential files
+
 ### Prerequisites
 
 ```bash
@@ -77,31 +100,12 @@ trossen-pick-place/
 pip install lerobot mujoco dm_control h5py opencv-python
 ```
 
-### Phase 1: Collect Training Data
+### One-Line Quick Test
 
 ```bash
-# Record 50 expert demonstrations
-python trossen_arm_mujoco/scripts/record_sim_episodes.py \
-  --task_name sim_pick_place \
-  --data_dir data/raw \
-  --num_episodes 50 \
-  --cam_names cam_high
-
-# Convert to LeRobot format
-python scripts/create_lerobot_dataset.py \
-  --data_dir data/raw \
-  --output_dir data/lerobot
+# See the expert policy in action (no training required)
+python scripts/visualize_expert_demo.py && open visualizations/expert_demo.mp4
 ```
-
-### Phase 2: Train ACT Policy
-
-```bash
-# Train for 30k steps (takes ~2-3 hours on Apple Silicon)
-python scripts/train_policy.py
-```
-
-### Phase 3: Deploy to Real Robot
-
 *Coming soon...*
 
 ---
