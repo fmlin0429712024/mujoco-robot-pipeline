@@ -32,9 +32,75 @@ This project demonstrates a complete robotics learning pipeline using the **ACT 
 └─────────────────┘     └─────────────────┘     └─────────────────┘
 ```
 
-> 💡 **Next Step:** Interested in Isaac Sim for real robot deployment? See [MuJoCo vs Isaac Sim Comparison](docs/mujoco_vs_isaac_sim.md)
+---
 
-> 📐 **For Developers:** See [Architecture Overview](docs/ARCHITECTURE.md) explains the complete pipeline in 5 minutes
+## 📚 Learning Path
+
+**New to robot learning?** Follow this path to go from zero to strategic understanding:
+
+### **Phase 1: Build Your Worldview** (15 min)
+
+*Understand why robots need learning and where the business value is*
+
+1. **[01 - Robot Learning Methods Overview](docs/01_robot_learning_methods_overview.md)** (5 min)
+   - When to use learning vs classical methods
+   - IL vs RL vs SLAM
+   - Decision framework
+
+2. **[02 - Robotics Use Cases and Solutions](docs/02_robotics_use_cases_and_solutions.md)** (10 min)
+   - AMR nursing home (2,000 facilities, $2M ROI)
+   - Pick-place demonstration (this project)
+   - Real business value explained
+
+### **Phase 2: Get Your Hands Dirty** (1-2 hours)
+
+*Run your first imitation learning model in MuJoCo*
+
+3. **[05 - Demo Design Architecture](docs/05_demo_design_architecture.md)** (5 min)
+   - Understand the complete pipeline
+   - See how all components fit together
+   - Critical bugs and lessons learned
+
+4. **Follow Step-by-Step Guides** (1-2 hours)
+   - [Phase 1: Data Collection](docs/guides/phase1_data_collection.md) (~25 min)
+   - [Phase 2: Training](docs/guides/phase2_training.md) (~2-3 hours)
+   - [Phase 3: Deployment](docs/guides/phase3_deployment.md) (~10 min)
+
+### **Phase 3: Think Like a Professional** (15 min)
+
+*Scale from demo to profitable, scalable industrial product*
+
+5. **[03 - Isaac Sim Platform Strategy](docs/03_isaac_sim_platform_strategy.md)** (10 min)
+   - 4-phase evolution roadmap (AMR → ARM → LEGS → VLA)
+   - Platform thinking: $3.79M ROI from $40K investment
+   - How to justify Isaac Sim to stakeholders
+
+6. **[04 - MuJoCo vs Isaac Sim](docs/04_mujoco_vs_isaac_sim.md)** (5 min)
+   - When to use each platform
+   - Migration from prototype to production
+   - Your next steps
+
+---
+
+## 🎯 Quick Start Options
+
+**Just want to see it work?** 
+```bash
+# Watch expert policy (no training needed, 30 seconds)
+python scripts/visualize_expert_demo.py
+open visualizations/expert_demo.mp4
+```
+
+**Want the full experience?**  
+Start with [Phase 1 worldview](#phase-1-build-your-worldview), then follow the guides.
+
+**Already know robot learning?**  
+Jump to [03 - Isaac Sim Platform Strategy](docs/03_isaac_sim_platform_strategy.md) for strategic insights.
+
+---
+
+> 📐 **For Developers:** See [Architecture Overview](docs/05_demo_design_architecture.md) explains the complete pipeline in 5 minutes
+
 
 ---
 
