@@ -456,128 +456,29 @@ You've completed the full learning journey!
 
 ---
 
-## PART 2: Cloud-Scale Production (Advanced)
+## Advanced Deployment Strategy
 
-> **⚠️ Optional Reading:** For hyper-scale deployments (1,000+ robots). Skip if you're still learning or deploying <100 robots.
+Ready to scale beyond the pilot phase?
 
-### **Topic: Cloud-Native Robotics Architecture**
+In **[Doc 07 - Advanced Cloud Architecture](07_advanced_cloud_architecture.md)**, we dive into Jensen Huang's "Three-Computer" vision and the Hybrid Cloud Orchestration model required for massive fleets (1,000+ robots).
 
-### **The Next Frontier: Isaac Sim on Kubernetes (GCP)**
-
-**What we covered:** Isaac Sim on your laptop/workstation
-
-**Industry bleeding edge:** Isaac Sim as cloud infrastructure
-
-```
-┌─────────────────────────────────────────────┐
-│    Cloud-Native Train-Test-Deploy Loop      │
-└─────────────────────────────────────────────┘
-
-Developer Push Code
-    ↓
-GCP Kubernetes (GKE)
-    ├─▶ Isaac Lab containers (4,096 parallel envs)
-    ├─▶ Nucleus (Digital Twin asset hub)
-    ├─▶ SDG (Synthetic Data Generation)
-    ├─▶ ROS 2 (Orchestration & communication)
-    └─▶ Triton Inference (Model serving)
-    
-Automated CI/CD:
-    ├─ Code commit → Docker build
-    ├─ Sim validation (Isaac Sim in CI!)
-    ├─ Model training (PPO/ACT at scale)
-    └─ Deploy to 2,000 edge devices ✅
-```
+**Doc 07 covers:**
+- The Three-Computer Architecture (Training, Sim, Runtime)
+- Hybrid Cloud Orchestration
+- The Data Flywheel
+- Deployment on NVIDIA Jetson Thor
 
 ---
 
-### **Key Technologies (1-sentence each)**
+## What's Next?
 
-**Isaac Lab (formerly Orbit):** Framework for RL training on top of Isaac Sim, designed for Kubernetes
+You've completed the core learning journey! 
 
-**Nucleus:** NVIDIA's digital twin asset server - stores 3D models, shares across team/fleet
+**Your next move depends on your goal:**
 
-**Synthetic Data Gen (SDG):** Automated pipeline generating labeled training data (e.g., 1M images overnight)
+**→ If learning:** Go back to [Doc 05](05_demo_design_architecture.md), improve your MuJoCo demo
+**→ If building product:** Start pilot deployment (10 robots), apply Pillar 3 (Safety) first!
+**→ If strategic planning:** Read [Doc 07](07_advanced_cloud_architecture.md) for the "Three-Computer" vision.
 
-**ROS 2:** Middleware orchestrating all components - handles messaging, node management, deployment coordination
-
-**Triton Inference Server:** High-performance model serving (ACT, YOLO, GR00T) to fleet
-
-**GR00T:** NVIDIA's foundation model for humanoid robots (think "GPT for robot movement")
-
----
-
-### **When You Need This**
-
-✅ **Deploying 1,000+ robots** across diverse locations
-
-✅ **Continuous retraining** from fleet data (data flywheel at scale)
-
-✅ **Multi-team collaboration** (need shared digital twin infrastructure)
-
-✅ **Compute budget** for GPU clusters (this isn't cheap!)
-
-**For your 2,000 AMR nursing home fleet:** This IS the architecture you'd use in Year 3-4
-
----
-
-### **Architecture Comparison**
-
-| Scale | Your Setup | Cloud-Native |
-|-------|-----------|--------------|
-| **<10 robots** | Laptop + Isaac Sim | Overkill |
-| **10-100 robots** | Workstation + Docker | Consider it |
-| **100-1,000 robots** | Small K8s cluster | Recommended |
-| **1,000+ robots** | Full GKE + Nucleus | Required ✅ |
-
----
-
-### **The Complete Stack**
-
-```
-Cloud (GCP/AWS):
-├─ Kubernetes cluster
-│  ├─ Isaac Lab training jobs
-│  ├─ Nucleus asset management
-│  └─ Triton model serving
-├─ Data lake (robot telemetry)
-└─ CI/CD pipeline (automated deploy)
-    ↓ deploys to
-Edge (2,000 Robots):
-├─ Jetson Orin (vision, control)
-├─ Trained models (downloaded from Triton)
-└─ Local safety layers
-    ↓ sends data back to
-Cloud (closes loop)
-```
-
-**This is Tesla Autopilot's architecture,** adapted for your robot fleet!
-
----
-
-### **Why This Matters (Even If You Don't Use It Now)**
-
-**Awareness:** Know this exists, so you design for it
-
-**Career:** Understanding cloud-native robotics = high-value skill
-
-**Scalability:** Build today's demo with tomorrow's architecture in mind
-
-**Example:** Your MuJoCo demo could run on this stack with minor changes (same LeRobot format, same ACT policy!)
-
----
-
-### **Next Steps (If Serious About This)**
-
-1. **Learn:** Kubernetes basics (before robotics specifics)
-2. **Read:** NVIDIA Isaac Lab documentation
-3. **Try:** Isaac Sim in Docker (local, then cloud)
-4. **Experiment:** Deploy to GCP/AWS free tier
-5. **Plan:** Cost analysis (GPU hours add up fast!)
-
----
-
-*Part 6 of 6-part learning journey - Complete!*
-
-**→ Start over:** [01 - Robot Learning Methods Overview](01_robot_learning_methods_overview.md)
+**The journey continues - now you have the complete map!** 🗺️
 
