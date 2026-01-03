@@ -1,4 +1,4 @@
-# 🤖 Trossen Arm Pick & Place with ACT Policy
+# 🤖 Imitation Learning (IL) Pipeline: Trossen Arm Pick & Place with ACT Policy
 
 > **My First Robot Project** - Learning robotics by building an end-to-end imitation learning pipeline
 
