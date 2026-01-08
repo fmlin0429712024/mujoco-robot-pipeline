@@ -123,6 +123,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--episodes", type=int, default=10, help="Number of episodes")
     parser.add_argument("--max_steps", type=int, default=600, help="Max steps per episode")
+    parser.add_argument("--output_video", type=str, default="visualizations/after_training.mp4", help="Output video path")
     
     args = parser.parse_args()
     
@@ -130,5 +131,6 @@ if __name__ == "__main__":
         checkpoint_dir=args.ckpt,
         num_episodes=args.episodes,
         inference_mode=args.mode,
-        max_steps=args.max_steps
+        max_steps=args.max_steps,
+        output_video=args.output_video
     )
