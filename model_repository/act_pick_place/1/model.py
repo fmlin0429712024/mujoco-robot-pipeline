@@ -142,14 +142,14 @@ class TritonPythonModel:
         Returns:
             action_np: Action array [batch, 8]
         """
-        print(f"[Triton Python Backend] _predict called with state shape: {state_np.shape}, image shape: {image_np.shape}")
+        # print(f"[Triton Python Backend] _predict called with state shape: {state_np.shape}, image shape: {image_np.shape}")
         
         with torch.no_grad():
             # Convert to torch tensors
             state = torch.from_numpy(state_np).float().to(self.device)
             image = torch.from_numpy(image_np).float().to(self.device)
             
-            print(f"[Triton Python Backend] Converted to torch - state: {state.shape}, image: {image.shape}")
+            # print(f"[Triton Python Backend] Converted to torch - state: {state.shape}, image: {image.shape}")
             
             # Apply ImageNet normalization to image
             image = (image - self.imagenet_mean) / self.imagenet_std
@@ -160,18 +160,18 @@ class TritonPythonModel:
                 "observation.images.top_cam": image,
             }
             
-            print(f"[Triton Python Backend] Calling policy.select_action...")
+            # print(f"[Triton Python Backend] Calling policy.select_action...")
             
             # Run inference
             action = self.policy.select_action(batch)
             
-            print(f"[Triton Python Backend] policy.select_action returned: {action.shape if hasattr(action, 'shape') else type(action)}")
-            print(f"[Triton Python Backend] action content: {action}")
+            # print(f"[Triton Python Backend] policy.select_action returned: {action.shape if hasattr(action, 'shape') else type(action)}")
+            # print(f"[Triton Python Backend] action content: {action}")
             
             # Unnormalize action if stats available
             if self.action_mean is not None:
                 action = action * self.action_std + self.action_mean
-                print(f"[Triton Python Backend] After unnormalization: {action}")
+                # print(f"[Triton Python Backend] After unnormalization: {action}")
             
             # DLPack Zero-Copy Transfer
             # 1. Detach and move to CPU (Triton Python Backend usually expects CPU tensors for response unless configured otherwise)
@@ -182,7 +182,7 @@ class TritonPythonModel:
             if not action.is_contiguous():
                 action = action.contiguous()
                 
-            print(f"[Triton Python Backend] action tensor before dlpack: shape={action.shape}, dtype={action.dtype}, device={action.device}")
+            # print(f"[Triton Python Backend] action tensor before dlpack: shape={action.shape}, dtype={action.dtype}, device={action.device}")
             
             # Create output tensor using DLPack
             output_tensor = pb_utils.Tensor.from_dlpack("output__0", to_dlpack(action))
