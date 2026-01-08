@@ -136,12 +136,15 @@ class TritonGRPCClient(InferenceClient):
         # Image: [H, W, 3] -> [1, 3, H, W] with ImageNet normalization
         image = observation["observation.images.top_cam"].astype(np.float32)
         
-        # Ensure HWC format
-        if image.shape[-1] != 3:
-            raise ValueError(f"Expected image in HWC format, got shape {image.shape}")
-        
-        # Convert to CHW
-        image = np.transpose(image, (2, 0, 1))  # [3, H, W]
+        # Handle format (GymEnv returns CHW, but raw images might be HWC)
+        if image.shape[0] == 3:
+            # Already CHW (3, H, W)
+            pass
+        elif image.shape[-1] == 3:
+            # HWC (H, W, 3) -> Convert to CHW
+            image = np.transpose(image, (2, 0, 1))
+        else:
+            raise ValueError(f"Expected image in CHW or HWC format, got shape {image.shape}")
         
         # Normalize to [0, 1]
         image = image / 255.0
