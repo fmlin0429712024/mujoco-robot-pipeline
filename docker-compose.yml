@@ -5,14 +5,32 @@ services:
     image: nvcr.io/nvidia/tritonserver:24.01-py3
     container_name: triton-inference-server
     ports:
-      - "8000:8000"   # HTTP
-      - "8001:8001"   # gRPC
-      - "8002:8002"   # Metrics
+      - "8000:8000" # HTTP
+      - "8001:8001" # gRPC
+      - "8002:8002" # Metrics
     volumes:
+      # Model repository
       - ./model_repository:/models
+      # Mount project source code for Python backend
+      - ./trossen_arm_mujoco:/workspace/trossen_arm_mujoco
+      - ./scripts:/workspace/scripts
+      # Mount checkpoint for model loading
+      - ./outputs:/workspace/outputs
+    environment:
+      # Add project to Python path
+      - PYTHONPATH=/workspace
+      # Checkpoint location
+      - CHECKPOINT_DIR=/workspace/outputs/train/act_pick_place_30k/checkpoints/030000/pretrained_model
     command: tritonserver --model-repository=/models --log-verbose=1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/v2/health/ready"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/v2/health/ready" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -20,26 +38,24 @@ services:
       - trossen-network
 
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
     container_name: trossen-app
     ports:
       - "8080:8080"
+    depends_on:
+      triton:
+        condition: service_healthy
     environment:
       - INFERENCE_MODE=triton
       - TRITON_URL=triton:8001
       - MODEL_NAME=act_pick_place
       - MODEL_VERSION=1
-      - MUJOCO_GL=osmesa
-      - PYOPENGL_PLATFORM=osmesa
-    depends_on:
-      triton:
-        condition: service_healthy
+      - MUJOCO_GL=egl
+      - PYOPENGL_PLATFORM=egl
     volumes:
-      - ./data:/app/data
-      - ./outputs:/app/outputs
-      - ./visualizations:/app/visualizations
+      - ./data:/workspace/data
+      - ./outputs:/workspace/outputs
+      - ./visualizations:/workspace/visualizations
     networks:
       - trossen-network
 
