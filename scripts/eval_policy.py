@@ -19,6 +19,7 @@ def eval_policy(
     num_episodes: int = 10,
     output_video: str = "visualizations/after_training.mp4",
     inference_mode: str = None,
+    max_steps: int = 600,
 ):
     """
     Evaluate trained policy using inference client.
@@ -50,7 +51,7 @@ def eval_policy(
         ep_reward = 0
         ep_success = False
         
-        max_steps = 600
+        # max_steps set by argument
         step = 0
         
         while not done and step < max_steps:
@@ -120,16 +121,14 @@ if __name__ == "__main__":
         default=None,
         help="Inference mode (defaults to INFERENCE_MODE env var)"
     )
-    parser.add_argument(
-        "--episodes",
-        type=int,
-        default=10,
-        help="Number of episodes to evaluate"
-    )
+    parser.add_argument("--episodes", type=int, default=10, help="Number of episodes")
+    parser.add_argument("--max_steps", type=int, default=600, help="Max steps per episode")
+    
     args = parser.parse_args()
     
     eval_policy(
         checkpoint_dir=args.ckpt,
-        inference_mode=args.mode,
         num_episodes=args.episodes,
+        inference_mode=args.mode,
+        max_steps=args.max_steps
     )
