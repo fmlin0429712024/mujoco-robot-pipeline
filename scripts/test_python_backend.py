@@ -118,6 +118,30 @@ def test_python_backend():
         traceback.print_exc()
         return False
     
+    
+    # Test inference (HTTP fallback check)
+    print("\n[Optional] Testing with HTTP client...")
+    try:
+        import tritonclient.http as httpclient
+        
+        triton_client = httpclient.InferenceServerClient(url="localhost:8000")
+        inputs_http = [
+            httpclient.InferInput("state__0", state.shape, "FP32"),
+            httpclient.InferInput("image__1", image.shape, "FP32"),
+        ]
+        inputs_http[0].set_data_from_numpy(state)
+        inputs_http[1].set_data_from_numpy(image)
+        outputs_http = [httpclient.InferRequestedOutput("output__0")]
+        
+        res = triton_client.infer(model_name, inputs_http, outputs=outputs_http)
+        print("✓ HTTP Inference response:", res.get_response())
+        print("✓ HTTP Output shape:", res.as_numpy("output__0").shape)
+        
+    except ImportError:
+        print("⚠ tritonclient[http] not installed")
+    except Exception as e:
+        print(f"✗ HTTP Inference failed: {e}")
+
     # Benchmark latency
     print("\n5. Benchmarking latency (10 requests)...")
     try:
