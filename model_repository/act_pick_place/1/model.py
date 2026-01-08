@@ -175,16 +175,15 @@ class TritonPythonModel:
                 action = action * self.action_std + self.action_mean
                 print(f"[Triton Python Backend] After unnormalization: {action}")
             
-            # Convert to numpy
-            action_np = action.cpu().numpy()
-            
-            # Ensure float32 and contiguous memory (CRITICAL for pb_utils.Tensor)
-            action_np = action_np.astype(np.float32)
-            if not action_np.flags['C_CONTIGUOUS']:
-                action_np = np.ascontiguousarray(action_np)
-            
-            # DEBUG: Hardcoded output to test serialization
-            # action_np = np.ones((1, 8), dtype=np.float32)
+            # Strict Data Conversion for Triton pb_utils
+            # 1. Detach and move to CPU
+            # 2. Convert to numpy
+            # 3. Force float32
+            # 4. Force contiguous
+            # 5. Explicit copy to ensure memory ownership
+            action_np = action.detach().cpu().numpy()
+            action_np = np.ascontiguousarray(action_np, dtype=np.float32)
+            action_np = action_np.copy()
             
             print(f"[Triton Python Backend] Returning action_np with shape: {action_np.shape}, dtype: {action_np.dtype}, contiguous: {action_np.flags['C_CONTIGUOUS']}, nbytes: {action_np.nbytes}")
             
