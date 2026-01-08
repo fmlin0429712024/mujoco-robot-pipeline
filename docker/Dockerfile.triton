@@ -1,7 +1,7 @@
 # Custom Triton Inference Server with Python Backend Dependencies
 # Based on NVIDIA Triton Server with PyTorch and LeRobot support
 
-FROM nvcr.io/nvidia/tritonserver:24.01-py3
+FROM nvcr.io/nvidia/tritonserver:24.04-py3
 
 # Metadata
 LABEL maintainer="Trossen Robotics Pick-Place Project"
