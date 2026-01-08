@@ -22,13 +22,15 @@ services:
       # Checkpoint location
       - CHECKPOINT_DIR=/workspace/outputs/train/act_pick_place_30k/checkpoints/030000/pretrained_model
     command: tritonserver --model-repository=/models --log-verbose=1
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [ gpu ]
+    # Note: GPU passthrough removed for macOS compatibility
+    # For Linux with NVIDIA GPU, uncomment:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8000/v2/health/ready" ]
       interval: 10s

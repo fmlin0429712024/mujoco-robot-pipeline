@@ -54,10 +54,14 @@ class TritonPythonModel:
         self.policy = ACTPolicy.from_pretrained(checkpoint_dir)
         self.policy.eval()
         
-        # Determine device (GPU if available, else CPU)
+        # Determine device (CPU for Mac, GPU for Linux)
         if torch.cuda.is_available():
             self.device = torch.device("cuda:0")
             print(f"[Triton Python Backend] Using GPU: {torch.cuda.get_device_name(0)}")
+        elif torch.backends.mps.is_available():
+            # macOS Metal Performance Shaders (not recommended for Triton)
+            self.device = torch.device("cpu")
+            print("[Triton Python Backend] Using CPU (MPS not supported in Docker)")
         else:
             self.device = torch.device("cpu")
             print("[Triton Python Backend] Using CPU")
