@@ -19,7 +19,7 @@ from trossen_arm_mujoco.inference_client import InferenceClient
 def inspect_predictions(
     checkpoint_dir: str = None, 
     repo_id: str = "sim_pick_place_demo", 
-    root: str = "/Users/folin/projects/trossen-pick-place/local/sim_pick_place_demo",
+    root: str = str(Path.home() / "projects/trossen-pick-place/local/sim_pick_place_demo"),
     num_samples: int = 100,
     inference_mode: str = None,
 ):

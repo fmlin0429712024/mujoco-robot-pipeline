@@ -95,6 +95,6 @@ def inspect_dataset(repo_id, root, output_video, num_episodes=5):
 if __name__ == "__main__":
     inspect_dataset(
         repo_id="sim_pick_place_demo",
-        root="/Users/folin/projects/trossen-pick-place/local/sim_pick_place_demo",
+        root=str(Path.home() / "projects/trossen-pick-place/local/sim_pick_place_demo"),
         output_video="visualizations/dataset_inspection.mp4"
     )

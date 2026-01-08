@@ -50,7 +50,7 @@ sys.argv = [
     "lerobot_train.py",
     "--policy.type", "act",
     "--dataset.repo_id", "sim_pick_place_demo",
-    "--dataset.root", "/Users/folin/projects/trossen-pick-place/data/lerobot",
+    "--dataset.root", "data/lerobot",
     "--dataset.video_backend", "pyav",
     "--env.type", "gym_manipulator",
     "--env.task", "OneArmPickPlace-v0",
