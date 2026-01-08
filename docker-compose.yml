@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  triton:
+    image: nvcr.io/nvidia/tritonserver:24.01-py3
+    container_name: triton-inference-server
+    ports:
+      - "8000:8000"   # HTTP
+      - "8001:8001"   # gRPC
+      - "8002:8002"   # Metrics
+    volumes:
+      - ./model_repository:/models
+    command: tritonserver --model-repository=/models --log-verbose=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v2/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - trossen-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: trossen-app
+    ports:
+      - "8080:8080"
+    environment:
+      - INFERENCE_MODE=triton
+      - TRITON_URL=triton:8001
+      - MODEL_NAME=act_pick_place
+      - MODEL_VERSION=1
+      - MUJOCO_GL=osmesa
+      - PYOPENGL_PLATFORM=osmesa
+    depends_on:
+      triton:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data
+      - ./outputs:/app/outputs
+      - ./visualizations:/app/visualizations
+    networks:
+      - trossen-network
+
+networks:
+  trossen-network:
+    driver: bridge

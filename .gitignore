@@ -8,3 +8,11 @@ output_csvs/
 data/
 .mypy_cache/
 .ruff_cache
+
+# Triton model repository (ONNX models are large)
+model_repository/*/1/*.onnx
+model_repository/*/1/*.pt
+model_repository/*/*.plan
+
+# Environment configuration (may contain secrets)
+.env

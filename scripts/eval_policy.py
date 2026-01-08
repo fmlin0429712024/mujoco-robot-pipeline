@@ -1,6 +1,5 @@
 
 import gymnasium as gym
-import torch
 import numpy as np
 import cv2
 import sys
@@ -12,90 +11,55 @@ from pathlib import Path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from trossen_arm_mujoco.gym_env import TrossenGymEnv
-from lerobot.policies.act.modeling_act import ACTPolicy
-from safetensors.torch import load_file
+from trossen_arm_mujoco.inference_client import InferenceClient
 
-def eval_policy(checkpoint_dir="outputs/train/act_pick_place_10k/checkpoints/010000/pretrained_model", num_episodes=10, output_video="visualizations/after_training.mp4"):
-    print(f"Loading policy from {checkpoint_dir}...")
-    # Load policy
-    policy = ACTPolicy.from_pretrained(checkpoint_dir)
-    policy.eval()
+
+def eval_policy(
+    checkpoint_dir: str = "outputs/train/act_pick_place_10k/checkpoints/010000/pretrained_model",
+    num_episodes: int = 10,
+    output_video: str = "visualizations/after_training.mp4",
+    inference_mode: str = None,
+):
+    """
+    Evaluate trained policy using inference client.
     
-    # Check device
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-    print(f"Using device: {device}")
-    policy.to(device)
-
-    # Load separate stats file for manual unnormalization
-    stats_path = os.path.join(checkpoint_dir, "policy_preprocessor_step_3_normalizer_processor.safetensors")
-    action_mean = None
-    action_std = None
+    Args:
+        checkpoint_dir: Path to checkpoint (used in local mode)
+        num_episodes: Number of episodes to evaluate
+        output_video: Path to save output video
+        inference_mode: "triton" or "local" (defaults to env var)
+    """
+    print(f"Initializing inference client...")
     
-    if os.path.exists(stats_path):
-        print(f"Loading normalization stats from {stats_path}")
-        stats = load_file(stats_path)
-        action_mean = stats["action.mean"].to(device)
-        action_std = stats["action.std"].to(device)
-    else:
-        print("WARNING: Stats file not found. Assuming unnormalized output.")
-
-    # Add features to env if missing (mimic training monkeypatch if needed, 
-    # but TrossenGymEnv defines spaces which should be enough for basic use)
-    # However, policy expects specific keys in forward()
+    # Create inference client (auto-detects mode from env or uses provided)
+    client = InferenceClient.create(
+        mode=inference_mode,
+        checkpoint_dir=checkpoint_dir,
+    )
     
     env = TrossenGymEnv(render_mode="rgb_array")
     
     success_count = 0
     total_rewards = []
-    
-    # Video writer setup
-    # We'll save the first episode or all? Let's save all contiguous for now or just first few.
-    # To make a nice video, let's stitch all episodes.
     frames = []
 
     for ep in range(num_episodes):
         print(f"Running Episode {ep+1}/{num_episodes} (Seed {ep})...")
-        obs, _ = env.reset(seed=ep) # Use training seeds (0-9) to check memorization
+        obs, _ = env.reset(seed=ep)
         done = False
         ep_reward = 0
         ep_success = False
         
-        # Max steps
         max_steps = 600
         step = 0
         
         while not done and step < max_steps:
-            # Prepare observation for policy
-            # Policy expects batch dim
-            state = torch.from_numpy(obs["observation.state"].copy()).float().unsqueeze(0).to(device)
-            image_raw = torch.from_numpy(obs["observation.images.top_cam"].copy()).float()
-            # Scale to [0,1] first
-            image = image_raw / 255.0
-            # Apply ImageNet normalization (must match training)
-            imagenet_mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
-            imagenet_std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
-            image = (image - imagenet_mean) / imagenet_std
-            image = image.unsqueeze(0).to(device)
-            # Image is [B, C, H, W] with ImageNet normalization
-            
-            batch = {
-                "observation.state": state,
-                "observation.images.top_cam": image
-            }
-            
-            with torch.no_grad():
-                action = policy.select_action(batch)
-            
-            # Manual Unnormalization
-            if action_mean is not None:
-                action = action * action_std + action_mean
-            
-            # Action is [B, D] -> [D]
-            action_np = action.squeeze(0).cpu().numpy()
+            # Run inference using client (handles all preprocessing)
+            action_np = client.predict(obs)
             
             obs, reward, terminated, truncated, info = env.step(action_np)
             
-            # Check success condition (reward == 4 means success as per SimEnv)
+            # Check success condition
             if reward == 4:
                 ep_success = True
             
@@ -118,6 +82,7 @@ def eval_policy(checkpoint_dir="outputs/train/act_pick_place_10k/checkpoints/010
         total_rewards.append(ep_reward)
 
     env.close()
+    client.close()
     
     success_rate = success_count / num_episodes
     print(f"\nEvaluation Complete.")
@@ -128,22 +93,43 @@ def eval_policy(checkpoint_dir="outputs/train/act_pick_place_10k/checkpoints/010
         print(f"Saving video to {output_video}...")
         os.makedirs(os.path.dirname(output_video), exist_ok=True)
         height, width, layers = frames[0].shape
-        # mp4v or h264
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         video = cv2.VideoWriter(output_video, fourcc, 30, (width, height))
         
         for frame in frames:
-            # OpenCV expects BGR
             frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
             video.write(frame_bgr)
             
         video.release()
         print("Video saved.")
 
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--ckpt", type=str, default="outputs/train/act_pick_place_30k/checkpoints/030000/pretrained_model")
+    parser.add_argument(
+        "--ckpt",
+        type=str,
+        default="outputs/train/act_pick_place_30k/checkpoints/030000/pretrained_model",
+        help="Checkpoint directory (for local mode)"
+    )
+    parser.add_argument(
+        "--mode",
+        type=str,
+        choices=["triton", "local"],
+        default=None,
+        help="Inference mode (defaults to INFERENCE_MODE env var)"
+    )
+    parser.add_argument(
+        "--episodes",
+        type=int,
+        default=10,
+        help="Number of episodes to evaluate"
+    )
     args = parser.parse_args()
     
-    eval_policy(args.ckpt)
+    eval_policy(
+        checkpoint_dir=args.ckpt,
+        inference_mode=args.mode,
+        num_episodes=args.episodes,
+    )
