@@ -7,6 +7,7 @@ This model runs inside the Triton container and handles stateful ACT policy infe
 import json
 import numpy as np
 import torch
+from torch.utils.dlpack import to_dlpack
 import triton_python_backend_utils as pb_utils
 from pathlib import Path
 
@@ -109,18 +110,8 @@ class TritonPythonModel:
                 state_np = state_tensor.as_numpy()  # [batch, 8]
                 image_np = image_tensor.as_numpy()  # [batch, 3, 480, 640]
                 
-                # Preprocess and run inference
-                action_np = self._predict(state_np, image_np)
-                
-                # Create output tensor
-                output_tensor = pb_utils.Tensor("output__0", action_np)
-                
-                # Verify internal content immediately
-                try:
-                    debug_check = output_tensor.as_numpy()
-                    print(f"[Triton Python Backend] output_tensor created. as_numpy() check: shape={debug_check.shape}, nbytes={debug_check.nbytes}, first_val={debug_check.flatten()[0]}")
-                except Exception as e:
-                     print(f"[Triton Python Backend] FAILED to convert output_tensor back to numpy: {e}")
+                # Preprocess and run inference (returns pb_utils.Tensor)
+                output_tensor = self._predict(state_np, image_np)
                 
                 # Create response
                 inference_response = pb_utils.InferenceResponse(
@@ -182,19 +173,21 @@ class TritonPythonModel:
                 action = action * self.action_std + self.action_mean
                 print(f"[Triton Python Backend] After unnormalization: {action}")
             
-            # Strict Data Conversion for Triton pb_utils
-            # 1. Detach and move to CPU
-            # 2. Convert to numpy
-            # 3. Force float32
-            # 4. Force contiguous
-            # 5. Explicit copy to ensure memory ownership
-            action_np = action.detach().cpu().numpy()
-            action_np = np.ascontiguousarray(action_np, dtype=np.float32)
-            action_np = action_np.copy()
+            # DLPack Zero-Copy Transfer
+            # 1. Detach and move to CPU (Triton Python Backend usually expects CPU tensors for response unless configured otherwise)
+            # 2. Ensure contiguous and float32
+            # 3. Create Triton Tensor via DLPack
             
-            print(f"[Triton Python Backend] Returning action_np with shape: {action_np.shape}, dtype: {action_np.dtype}, contiguous: {action_np.flags['C_CONTIGUOUS']}, nbytes: {action_np.nbytes}")
+            action = action.detach().cpu().float()
+            if not action.is_contiguous():
+                action = action.contiguous()
+                
+            print(f"[Triton Python Backend] action tensor before dlpack: shape={action.shape}, dtype={action.dtype}, device={action.device}")
             
-            return action_np
+            # Create output tensor using DLPack
+            output_tensor = pb_utils.Tensor.from_dlpack("output__0", to_dlpack(action))
+            
+            return output_tensor
 
     def finalize(self):
         """
