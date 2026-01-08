@@ -179,11 +179,14 @@ class TritonPythonModel:
             action_np = action.cpu().numpy()
             
             # Ensure float32 and contiguous memory (CRITICAL for pb_utils.Tensor)
-            action_np = action_np.astype(np.float32)
-            if not action_np.flags['C_CONTIGUOUS']:
-                action_np = np.ascontiguousarray(action_np)
+            # DEBUG: Hardcoded output to test serialization
+            action_np = np.ones((1, 8), dtype=np.float32)
             
-            print(f"[Triton Python Backend] Returning action_np with shape: {action_np.shape}, dtype: {action_np.dtype}, contiguous: {action_np.flags['C_CONTIGUOUS']}")
+            # action_np = action_np.astype(np.float32)
+            # if not action_np.flags['C_CONTIGUOUS']:
+            #    action_np = np.ascontiguousarray(action_np)
+            
+            print(f"[Triton Python Backend] Returning action_np with shape: {action_np.shape}, dtype: {action_np.dtype}, contiguous: {action_np.flags['C_CONTIGUOUS']}, nbytes: {action_np.nbytes}")
             
             return action_np
 
