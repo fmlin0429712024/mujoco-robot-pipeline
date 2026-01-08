@@ -1,0 +1,63 @@
+# Custom Triton Inference Server with Python Backend Dependencies
+# Based on NVIDIA Triton Server with PyTorch and LeRobot support
+
+FROM nvcr.io/nvidia/tritonserver:24.01-py3
+
+# Metadata
+LABEL maintainer="Trossen Robotics Pick-Place Project"
+LABEL description="Triton Inference Server with ACT Policy dependencies"
+
+# Set working directory
+WORKDIR /workspace
+
+# Install system dependencies (if needed)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Install PyTorch (CPU version for macOS compatibility)
+# For GPU on Linux, use: torch torchvision --index-url https://download.pytorch.org/whl/cu118
+RUN pip install --no-cache-dir \
+    torch==2.1.0 \
+    torchvision==0.16.0 \
+    --index-url https://download.pytorch.org/whl/cpu
+
+# Install core ML dependencies
+RUN pip install --no-cache-dir \
+    numpy>=1.24.0 \
+    safetensors>=0.4.0 \
+    pillow>=10.0.0
+
+# Install LeRobot and its dependencies
+RUN pip install --no-cache-dir \
+    lerobot \
+    gymnasium \
+    opencv-python-headless
+
+# Install additional dependencies that might be needed
+RUN pip install --no-cache-dir \
+    transformers \
+    datasets \
+    huggingface-hub
+
+# Clean up pip cache to reduce image size
+RUN pip cache purge
+
+# Verify installations
+RUN python -c "import torch; print(f'PyTorch: {torch.__version__}')" && \
+    python -c "import lerobot; print('LeRobot: OK')" && \
+    python -c "import safetensors; print('SafeTensors: OK')" && \
+    python -c "import triton_python_backend_utils as pb_utils; print('Triton Python Backend: OK')"
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/workspace
+
+# Expose Triton ports
+EXPOSE 8000 8001 8002
+
+# Default command (can be overridden in docker-compose)
+CMD ["tritonserver", "--model-repository=/models"]

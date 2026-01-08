@@ -1,0 +1,7 @@
+# Docker build artifacts
+*.log
+.dockerignore
+
+# Temporary files
+*.tmp
+*.swp
