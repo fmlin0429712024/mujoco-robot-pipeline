@@ -37,9 +37,3 @@ dynamic_batching {
   preferred_batch_size: [ 4, 8 ]
   max_queue_delay_microseconds: 100
 }
-
-# Python backend specific parameters
-parameters: {
-  key: "EXECUTION_ENV_PATH"
-  value: {string_value: "/opt/tritonserver/python_env.tar.gz"}
-}

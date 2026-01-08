@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   triton:
-    image: nvcr.io/nvidia/tritonserver:24.01-py3
+    build:
+      context: ./docker
+      dockerfile: Dockerfile.triton
     container_name: triton-inference-server
     ports:
       - "8000:8000" # HTTP
