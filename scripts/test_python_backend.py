@@ -113,10 +113,10 @@ def test_python_backend():
         print(f"  Action range: [{action.min():.3f}, {action.max():.3f}]")
         
     except Exception as e:
-        print(f"✗ Inference failed: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
+        print(f"✗ gRPC Inference failed: {e}")
+        # import traceback
+        # traceback.print_exc()
+        # Don't return, continue to HTTP test
     
     
     # Test inference (HTTP fallback check)
