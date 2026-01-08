@@ -115,6 +115,13 @@ class TritonPythonModel:
                 # Create output tensor
                 output_tensor = pb_utils.Tensor("output__0", action_np)
                 
+                # Verify internal content immediately
+                try:
+                    debug_check = output_tensor.as_numpy()
+                    print(f"[Triton Python Backend] output_tensor created. as_numpy() check: shape={debug_check.shape}, nbytes={debug_check.nbytes}, first_val={debug_check.flatten()[0]}")
+                except Exception as e:
+                     print(f"[Triton Python Backend] FAILED to convert output_tensor back to numpy: {e}")
+                
                 # Create response
                 inference_response = pb_utils.InferenceResponse(
                     output_tensors=[output_tensor]
