@@ -2,69 +2,72 @@
 
 This guide covers deploying and using the NVIDIA Triton Inference Server for ACT policy inference.
 
-## Quick Start
+> [!IMPORTANT]
+> **Current Status**: The inference abstraction layer is fully implemented and working in **local mode**. Triton deployment is ready but model export is blocked by ACT model complexity (internal state makes ONNX/TorchScript export challenging). See [Export Challenges](#export-challenges) section below.
 
-### 1. Export Model to ONNX
+## Quick Start (Local Mode - Working Now)
 
-First, export your trained ACT policy to ONNX format:
+### 1. Run Inference Locally
+
+The easiest way to use the new inference architecture:
 
 ```bash
-python scripts/export_model_to_triton.py \
-  --checkpoint outputs/train/act_pick_place_30k/checkpoints/030000/pretrained_model \
-  --output model_repository/act_pick_place/1/model.onnx
+# Set mode to local (or omit, it's the default)
+export INFERENCE_MODE=local
+
+# Run evaluation
+python scripts/eval_policy.py --mode local --episodes 10
+```
+
+This uses the `InferenceClient` abstraction with local PyTorch inference - **fully functional and tested**.
+
+### 2. Test the Inference Client
+
+Debug and verify the setup:
+
+```bash
+python scripts/debug_policy_api.py
 ```
 
 This will:
-- Load the PyTorch checkpoint
-- Export to ONNX format (or fallback to TorchScript if needed)
-- Verify the exported model matches PyTorch outputs
-- Place the model in the Triton repository
+- Load the policy from checkpoint
+- Initialize the inference client
+- Run a test inference with dummy data
+- Report success/failure
 
-### 2. Start Triton Server
+---
 
-Using Docker Compose (recommended):
+## Triton Mode (Infrastructure Ready, Export Blocked)
 
-```bash
-docker-compose up triton
+The Triton infrastructure is fully implemented but requires model export, which is currently challenging for ACT models.
+
+### Why Export is Challenging
+
+The ACT policy has **internal state** that makes standard export difficult:
+
+```python
+# Inside ACT model
+self._action_queue = []  # Maintains history between calls
 ```
 
-Or standalone Docker:
+**Issues encountered:**
+- ✗ ONNX export: Requires `action` key in forward() that's not available during inference
+- ✗ TorchScript tracing: Internal state prevents tracing
+- ✗ TorchScript scripting: PyTorch internal assertion failures
 
+### If You Want to Try Triton (Advanced)
+
+**Option 1: Use PyTorch Backend** (attempted, but has issues)
 ```bash
-docker run --rm \
-  -p 8000:8000 -p 8001:8001 -p 8002:8002 \
-  -v $(pwd)/model_repository:/models \
-  nvcr.io/nvidia/tritonserver:24.01-py3 \
-  tritonserver --model-repository=/models --log-verbose=1
+python scripts/save_model_for_triton.py
 ```
 
-### 3. Verify Server is Running
+**Option 2: Wait for LeRobot Export Support**
+The LeRobot team may add official export support in future versions.
 
-```bash
-# Check server health
-curl http://localhost:8000/v2/health/ready
+**Option 3: Use a Simpler Model**
+If you train a different policy without internal state, the export scripts will work.
 
-# Check model status
-curl http://localhost:8000/v2/models/act_pick_place
-
-# Run comprehensive test
-python scripts/test_triton_connection.py
-```
-
-### 4. Run Inference
-
-Set environment variables:
-
-```bash
-export INFERENCE_MODE=triton
-export TRITON_URL=localhost:8001
-```
-
-Run evaluation:
-
-```bash
-python scripts/eval_policy.py --mode triton
-```
 
 ---
 
@@ -117,20 +120,20 @@ python scripts/eval_policy.py --mode triton
 model_repository/
 └── act_pick_place/
     ├── config.pbtxt          # Triton configuration
-    ├── 1/                    # Version 1
-    │   └── model.onnx        # ONNX model
-    └── 2/                    # Version 2 (optional)
-        └── model.onnx
+    └── 1/                    # Version 1
+        └── model.pt          # PyTorch model (when export works)
 ```
 
 ### config.pbtxt
 
 The configuration file defines:
-- **Platform**: `onnxruntime_onnx` (or `pytorch_libtorch` for TorchScript)
-- **Inputs**: State (14D) and image (3x480x640)
-- **Outputs**: Action (14D)
+- **Platform**: `pytorch_libtorch` (for PyTorch models)
+- **Inputs**: State (8D) and image (3x480x640)
+- **Outputs**: Action (8D)
 - **Batching**: Dynamic batching with preferred sizes [4, 8]
 - **Instance**: CPU-based (change to `KIND_GPU` for GPU)
+
+**Note**: Input/output names for PyTorch backend use positional notation (`state__0`, `image__1`, `output__0`).
 
 ---
 
@@ -195,6 +198,48 @@ instance_group [
   }
 ]
 ```
+
+---
+
+## Export Challenges
+
+### ACT Model Complexity
+
+The ACT policy from LeRobot has characteristics that make standard export difficult:
+
+**1. Stateful Architecture**
+```python
+class ACTPolicy:
+    def __init__(self):
+        self._action_queue = []  # Internal state
+```
+
+The model maintains an action queue between inference calls, which violates the stateless assumption of ONNX/TorchScript.
+
+**2. Forward Method Signature**
+```python
+def forward(self, batch):
+    # Expects 'action' key for training
+    loss = F.l1_loss(batch["action"], predicted_action)
+```
+
+The `forward()` method requires an `action` key that's not available during inference, making direct export impossible.
+
+**3. Complex Control Flow**
+The model uses dynamic operations (list extensions, conditional logic) that are hard to trace.
+
+### Attempted Solutions
+
+**ONNX Export**: Failed due to missing `action` key in batch
+**TorchScript Tracing**: Failed due to internal state modifications
+**TorchScript Scripting**: Failed with PyTorch internal assertion errors
+**Wrapper Approach**: Created inference wrapper, but still hits export limitations
+
+### Workarounds
+
+**Current**: Use local mode with `InferenceClient` - works perfectly!
+**Future**: Wait for LeRobot to add official export support
+**Alternative**: Use Triton's Python backend (custom code, not standard model serving)
 
 ---
 
