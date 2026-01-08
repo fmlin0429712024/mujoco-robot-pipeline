@@ -178,7 +178,12 @@ class TritonPythonModel:
             # Convert to numpy
             action_np = action.cpu().numpy()
             
-            print(f"[Triton Python Backend] Returning action_np with shape: {action_np.shape}")
+            # Ensure float32 and contiguous memory (CRITICAL for pb_utils.Tensor)
+            action_np = action_np.astype(np.float32)
+            if not action_np.flags['C_CONTIGUOUS']:
+                action_np = np.ascontiguousarray(action_np)
+            
+            print(f"[Triton Python Backend] Returning action_np with shape: {action_np.shape}, dtype: {action_np.dtype}, contiguous: {action_np.flags['C_CONTIGUOUS']}")
             
             return action_np
 
