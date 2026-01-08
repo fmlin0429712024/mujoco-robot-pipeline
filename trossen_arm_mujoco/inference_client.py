@@ -180,7 +180,7 @@ class TritonGRPCClient(InferenceClient):
         inputs = []
         inputs.append(
             self.grpcclient.InferInput(
-                "observation.state",
+                "state__0",
                 processed["observation.state"].shape,
                 self.np_to_triton_dtype(processed["observation.state"].dtype),
             )
@@ -189,7 +189,7 @@ class TritonGRPCClient(InferenceClient):
         
         inputs.append(
             self.grpcclient.InferInput(
-                "observation.images.top_cam",
+                "image__1",
                 processed["observation.images.top_cam"].shape,
                 self.np_to_triton_dtype(processed["observation.images.top_cam"].dtype),
             )
@@ -197,7 +197,7 @@ class TritonGRPCClient(InferenceClient):
         inputs[1].set_data_from_numpy(processed["observation.images.top_cam"])
         
         # Create output placeholder
-        outputs = [self.grpcclient.InferRequestedOutput("action")]
+        outputs = [self.grpcclient.InferRequestedOutput("output__0")]
         
         # Run inference
         response = self.client.infer(
@@ -208,7 +208,7 @@ class TritonGRPCClient(InferenceClient):
         )
         
         # Extract action
-        action = response.as_numpy("action")
+        action = response.as_numpy("output__0")
         
         # Remove batch dimension: [1, 8] -> [8]
         if action.ndim == 2 and action.shape[0] == 1:
