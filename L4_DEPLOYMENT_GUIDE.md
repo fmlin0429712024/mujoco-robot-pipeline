@@ -2,21 +2,6 @@
 
 ## Quick Start on L4 Instance
 
-### 1. SSH into Your VM
-
-```bash
-gcloud compute ssh --zone "us-central1-c" "isaac-sim-01" --project "prescientdemos"
-```
-
-### 2. Clone/Pull the Repository
-
-```bash
-# If first time
-git clone https://github.com/fmlin0429712024/mujoco-robot-pipeline.git
-cd mujoco-robot-pipeline
-
-# If already cloned
-cd mujoco-robot-pipeline
 git pull origin main
 ```
 
