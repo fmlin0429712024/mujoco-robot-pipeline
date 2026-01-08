@@ -85,7 +85,7 @@ class TritonPythonModel:
         self.imagenet_mean = torch.tensor([0.485, 0.456, 0.406], device=self.device).view(3, 1, 1)
         self.imagenet_std = torch.tensor([0.229, 0.224, 0.225], device=self.device).view(3, 1, 1)
         
-        print("[Triton Python Backend] ✓ Model initialized successfully")
+        print("[Triton Python Backend] Model initialized successfully")
 
     def execute(self, requests):
         """
