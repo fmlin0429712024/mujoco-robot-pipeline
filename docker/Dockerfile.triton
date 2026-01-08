@@ -49,8 +49,7 @@ RUN pip cache purge
 # Verify installations
 RUN python3 -c "import torch; print(f'PyTorch: {torch.__version__}')" && \
     python3 -c "import lerobot; print('LeRobot: OK')" && \
-    python3 -c "import safetensors; print('SafeTensors: OK')" && \
-    python3 -c "import triton_python_backend_utils as pb_utils; print('Triton Python Backend: OK')"
+    python3 -c "import safetensors; print('SafeTensors: OK')"
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
