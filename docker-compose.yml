@@ -32,6 +32,8 @@ services:
       retries: 5
     networks:
       - trossen-network
+    environment:
+      - ROS_DOMAIN_ID=42
 
   nim-wrapper:
     build:
@@ -71,12 +73,6 @@ services:
       - ./visualizations:/workspace/visualizations
     networks:
       - trossen-network
-    environment:
-      - INFERENCE_MODE=nim
-      - INFERENCE_API_URL=http://nim-wrapper:8000
-      - MUJOCO_GL=egl
-      - PYOPENGL_PLATFORM=egl
-      - ROS_DOMAIN_ID=42
 
   ros-monitor:
     image: ros:humble-ros-base
