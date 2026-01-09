@@ -14,6 +14,12 @@ gcloud compute ssh --zone "us-central1-c" "isaac-sim-01" --project "prescientdem
 gcloud compute instances stop "isaac-sim-01" --zone "us-central1-c" --project "prescientdemos"
 ```
 
+### Or, if you are already INSIDE the VM:
+```bash
+# Stop containers and shut down the OS (GCP will detect this and stop the instance)
+cd ~/mujoco-robot-pipeline && docker compose down && sudo shutdown -h now
+```
+
 > **Verify:** Check the [Google Cloud Console](https://console.cloud.google.com/compute/instances) to ensure the instance status is **STOPPED**.
 
 ---
