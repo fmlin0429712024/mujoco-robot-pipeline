@@ -1,87 +1,83 @@
-# NIM-Style Microservices Architecture
+# Distributed ROS 2 & NIM Architecture
 
 ## Overview
 
-We have evolved our inference stack from a direct client-server model to a **NIM-style (NVIDIA Inference Microservice)** architecture. This introduces a dedicated intermediate layer—the **NIM Wrapper**—between the application logic and the high-performance inference engine (Triton).
+We have evolved our inference stack into a **Distributed ROS 2 Architecture**.
+-   **The Body**: The MuJoCo simulation now runs as a ROS 2 Node (`trossen_body`).
+-   **The Brain**: The NIM Wrapper now runs as a ROS 2 Node (`nim_brain`).
+-   **The Engine**: NVIDIA Triton Inference Server handles the heavy lifting (GPU inference).
 
 ### Why this architecture?
 
-1.  **Decoupling at the Protocol Level**: The Client Application (`trossen_arm_mujoco`) no longer needs to import complex libraries like `tritonclient` or manage gRPC channels. It speaks pure, standard `JSON/HTTP`.
-2.  **Logic Encapsulation**: Special preprocessing (cleaning outputs, reshaping tensors) lives "near the model" in the wrapper, not "near the robot". This makes the robot code cleaner and the model more portable.
-3.  **Future-Proofing (Security & Auth)**: This wrapper is the perfect place to enforce API Keys, OAuth, or Rate Limiting before requests ever hit the heavy inference engine.
+1.  **Standard Robotics Protocol**: By speaking **ROS 2** (DDS/RTPS) instead of custom HTTP/JSON, we align with the industry standard.
+2.  **Location transparency**: The "Brain" can be on the same L4 instance, or on a remote Jetson Orin on a real robot. The "Body" just publishes to a topic and doesn't care.
+3.  **Asynchronous Control**: The Pub/Sub model decouples the simulation loop (50Hz) from the inference latency.
 
-## Architecture
+## Architecture Diagram
 
 ```mermaid
-graph LR
-    subgraph "Robot / Client App"
-        Client[NIM Client] 
-        Logic[Control Policy]
-    end
+graph TD
+    subgraph "L4 Instance (Docker Network)"
+        
+        subgraph "Body (App Container)"
+            Sim[MuJoCo Simulation]
+            RosApp[ROS 2 Node]
+            Sim <--> RosApp
+        end
 
-    subgraph "NIM Microservice Layer"
-        API[FastAPI Wrapper]
-        Auth[Security / Auth (Future)]
-        Pre[Preprocessing]
-        Post[Postprocessing]
-    end
+        subgraph "Brain (NIM Wrapper Container)"
+            RosBrain[ROS 2 Node]
+            Wrapper[NIM Logic]
+            RosBrain <--> Wrapper
+        end
+        
+        subgraph "Inference Backend"
+            Triton[Triton Server]
+        end
 
-    subgraph "Inference Backend"
-        Triton[Triton Server]
-        Model[ACT Model (ONNX)]
+        RosApp -- "/robot/joint_states" (Pub) --> RosBrain
+        RosBrain -- "/robot/target_cmd" (Pub) --> RosApp
+        Wrapper -- "gRPC (Tensors)" --> Triton
     end
-
-    Logic --> Client
-    Client -- "JSON (HTTP POST)" --> API
-    API --> Auth
-    Auth --> Pre
-    Pre -- "Tensors (gRPC)" --> Triton
-    Triton --> Model
-    Model --> Triton
-    Triton -- "Tensors (gRPC)" --> Post
-    Post --> API
-    API -- "JSON (Action)" --> Client
 ```
 
 ## Implementation Details
 
-### 1. The Wrapper Service (`nim_wrapper/`)
-A lightweight Python container running `FastAPI` and `Uvicorn`.
--   **Endpoint**: `POST /predict`
--   **Input**: JSON with `state` (list) and `image` (nested list).
--   **Output**: JSON with `action` (list).
--   **Responsibilities**:
-    -   Validates generic JSON inputs.
-    -   Converts data to NumPy arrays and Triton-friendly tensors.
-    -   Handles the efficient gRPC connection to Triton.
-    -   Exposes a `/health` endpoint for readiness checks.
+### 1. The Brain Node (`nim_wrapper/main.py`)
+A `rclpy` node that bridges ROS 2 topics to Triton.
+-   **Subscriber**: `/robot/joint_states` (sensor_msgs/JointState)
+-   **Publisher**: `/robot/target_cmd` (std_msgs/Float32MultiArray)
+-   **Logic**:
+    1.  Receives Joint State.
+    2.  Preprocesses data (normalizes, potentially adds dummy image if camera not active).
+    3.  Calls Triton via gRPC.
+    4.  Publishes Policy Action.
 
-### 2. The Client (`NIMClient`)
-A "dumb" HTTP client located in `trossen_arm_mujoco/inference_client.py`.
--   Uses standard `urllib` (no external heavy dependencies).
--   Treats the AI brain as a black box: "Here is what I see (Observation), tell me what to do (Action)."
+### 2. The Body Node (`scripts/ros_sim_bridge.py`)
+A `rclpy` node that wraps the MuJoCo Gym Environment.
+-   **Publisher**: `/robot/joint_states` (Current position/velocity)
+-   **Subscriber**: `/robot/target_cmd` (Next desired position)
+-   **Logic**:
+    -   Runs simulation loop at fixed frequency (e.g., 50Hz).
+    -   Applies `last_received_action` to physics.
+    -   Publishes new state.
 
 ### 3. Deployment
-The wrapper is deployed as a sidecar or standalone service in `docker-compose.yml`.
+All services run in a unified `docker-compose.yml` network with `ROS_DOMAIN_ID=42`.
 
 ```yaml
   nim-wrapper:
-    build:
-      context: ./nim_wrapper
+    image: ros:humble-ros-base
+    command: python3 -u main.py
     environment:
       - TRITON_URL=triton:8001
-      - MODEL_NAME=act_pick_place
-    depends_on:
-      triton:
-        condition: service_healthy
+      - ROS_DOMAIN_ID=42
 ```
 
-## Future Security & Extensibility
+## Moving to Production (Real Robot)
 
-Users often ask: *"Where do I add API Keys?"* or *"How do I secure this?"*
-
-**The NIM Wrapper is the correct place for this.**
-
-Because Triton is designed for raw performance inside a trusted network, it doesn't natively handle complex keys or user management easily. You should:
-1.  **Add Middleware to FastAPI**: In `nim_wrapper/main.py`, simply add a dependency that expects an `Authorization: Bearer <token>` header.
-2.  **Keep Triton Private**: In a real production cluster, verify that Triton's ports (8000-8002) are *not* exposed to the public internet, while the NIM Wrapper's port *is* (protected by your auth logic).
+To switch from *Simulation* to *Real World*:
+1.  **Stop** the `trossen-app` container (The Sim Body).
+2.  **Start** your real robot driver (e.g., `interbotix_xs_driver`).
+3.  Ensure the real driver publishes `/robot/joint_states` and accepts `/robot/target_cmd`.
+4.  The "Brain" (NIM Wrapper) needs **zero changes**. It just sees topics on the network.
