@@ -24,6 +24,7 @@ services:
       - PYTHONPATH=/workspace
       # Checkpoint location
       - CHECKPOINT_DIR=/workspace/outputs/train/act_pick_place_30k/checkpoints/030000/pretrained_model
+      - ROS_DOMAIN_ID=42
     command: tritonserver --model-repository=/models --log-verbose=1 --model-control-mode=poll --repository-poll-secs=5
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8000/v2/health/ready" ]
