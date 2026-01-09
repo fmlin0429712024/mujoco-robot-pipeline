@@ -55,6 +55,7 @@ services:
   app:
     build: .
     container_name: trossen-app
+    command: sleep infinity
     ports:
       - "8080:8080"
     depends_on:
