@@ -18,7 +18,9 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     unzip \
     wget \
+    wget \
     git \
+    python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
 # Set environment variables for MuJoCo to use EGL (Hardware acceleration if avail) or OSMesa (Software)
