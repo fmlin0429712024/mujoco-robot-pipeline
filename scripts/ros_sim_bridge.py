@@ -57,8 +57,17 @@ class RobotBodyNode(Node):
         # Inspecting previous `nim_wrapper` log or code: `state.shape` was [8].
         # In `eval_policy.py`: `obs` was passed to `predict`.
         
-        # If obs is a dict:
-        state_vec = obs['state'] if isinstance(obs, dict) else obs
+        if isinstance(obs, dict):
+             if 'observation.state' in obs:
+                 state_vec = obs['observation.state']
+             elif 'state' in obs:
+                 state_vec = obs['state']
+             else:
+                 # Fallback / Debug
+                 self.get_logger().error(f"Obs keys: {obs.keys()}")
+                 state_vec = np.zeros(8)
+        else:
+             state_vec = obs
         # If it contains image too, we need separation.
         # Actually TrossenGymEnv usually returns dict with "pixel_values" and "agent_pos".
         # But `eval_policy` code passed `obs` directly.
