@@ -69,7 +69,7 @@ This project demonstrates a complete robotics learning pipeline using the **ACT 
    - The "Three-Computer" Vision (Jensen Huang).
    - Hybrid Cloud Orchestration & Data Flywheels.
 9. **[10 - NIM Microservices Architecture](docs/10_nim_microservice_architecture.md)**
-   - **NEW**: Refactoring to a decoupled, API-first microservices pattern (Triton + FastAPI).
+   - **NEW**: Refactoring to a **Distributed ROS 2 Architecture** (ROS 2 Node + Triton).
 
 ---
 
