@@ -1,5 +1,6 @@
 
-FROM python:3.10-slim-bullseye
+
+FROM ros:humble-ros-base
 
 # Install system dependencies for MuJoCo and OpenGL (EGL/OSMesa)
 # libgl1-mesa-dev, libgl1-mesa-glx, libosmesa6-dev are standard for headless rendering

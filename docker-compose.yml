@@ -44,6 +44,7 @@ services:
       - TRITON_URL=triton:8001
       - MODEL_NAME=act_pick_place
       - MODEL_VERSION=1
+      - ROS_DOMAIN_ID=42
     depends_on:
       triton:
         condition: service_healthy
@@ -63,10 +64,26 @@ services:
       - INFERENCE_API_URL=http://nim-wrapper:8000
       - MUJOCO_GL=egl
       - PYOPENGL_PLATFORM=egl
+      - ROS_DOMAIN_ID=42
     volumes:
       - ./data:/workspace/data
       - ./outputs:/workspace/outputs
       - ./visualizations:/workspace/visualizations
+    networks:
+      - trossen-network
+    environment:
+      - INFERENCE_MODE=nim
+      - INFERENCE_API_URL=http://nim-wrapper:8000
+      - MUJOCO_GL=egl
+      - PYOPENGL_PLATFORM=egl
+      - ROS_DOMAIN_ID=42
+
+  ros-monitor:
+    image: ros:humble-ros-base
+    container_name: ros-monitor
+    command: sleep infinity
+    environment:
+      - ROS_DOMAIN_ID=42
     networks:
       - trossen-network
 
