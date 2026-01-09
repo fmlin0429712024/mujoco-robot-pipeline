@@ -24,12 +24,29 @@ services:
       - PYTHONPATH=/workspace
       # Checkpoint location
       - CHECKPOINT_DIR=/workspace/outputs/train/act_pick_place_30k/checkpoints/030000/pretrained_model
-    command: tritonserver --model-repository=/models --log-verbose=1
+    command: tritonserver --model-repository=/models --log-verbose=1 --model-control-mode=poll --repository-poll-secs=5
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8000/v2/health/ready" ]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - trossen-network
+
+  nim-wrapper:
+    build:
+      context: ./nim_wrapper
+      dockerfile: Dockerfile
+    container_name: nim-wrapper
+    ports:
+      - "8090:8000"
+    environment:
+      - TRITON_URL=triton:8001
+      - MODEL_NAME=act_pick_place
+      - MODEL_VERSION=1
+    depends_on:
+      triton:
+        condition: service_healthy
     networks:
       - trossen-network
 
@@ -39,13 +56,11 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      triton:
-        condition: service_healthy
+      nim-wrapper:
+        condition: service_started
     environment:
-      - INFERENCE_MODE=triton
-      - TRITON_URL=triton:8001
-      - MODEL_NAME=act_pick_place
-      - MODEL_VERSION=1
+      - INFERENCE_MODE=nim
+      - INFERENCE_API_URL=http://nim-wrapper:8000
       - MUJOCO_GL=egl
       - PYOPENGL_PLATFORM=egl
     volumes:

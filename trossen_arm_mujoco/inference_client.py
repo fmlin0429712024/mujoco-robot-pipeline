@@ -1,11 +1,7 @@
-"""
-Inference client abstraction for ACT policy.
-
-Supports both Triton Inference Server (gRPC) and local PyTorch inference.
-Mode is controlled via INFERENCE_MODE environment variable.
-"""
-
 import os
+import json
+import urllib.request
+import urllib.error
 from abc import ABC, abstractmethod
 from typing import Dict, Optional
 import numpy as np
@@ -18,17 +14,7 @@ class InferenceClient(ABC):
     
     @abstractmethod
     def predict(self, observation: Dict[str, np.ndarray]) -> np.ndarray:
-        """
-        Run inference on observation and return action.
-        
-        Args:
-            observation: Dictionary containing:
-                - "observation.state": Joint positions [8]
-                - "observation.images.top_cam": RGB image [H, W, 3]
-        
-        Returns:
-            action: Unnormalized target joint positions [8]
-        """
+        """Run inference on observation and return action."""
         pass
     
     @abstractmethod
@@ -39,36 +25,26 @@ class InferenceClient(ABC):
     @staticmethod
     def create(
         mode: Optional[str] = None,
-        triton_url: Optional[str] = None,
+        api_url: Optional[str] = None,
+        checkpoint_dir: Optional[str] = None,
+        # Legacy params ignored in NIM mode but kept for compat
         model_name: Optional[str] = None,
         model_version: Optional[str] = None,
-        checkpoint_dir: Optional[str] = None,
     ) -> "InferenceClient":
         """
         Factory method to create appropriate inference client.
         
         Args:
-            mode: "triton" or "local". Defaults to INFERENCE_MODE env var or "local"
-            triton_url: Triton server URL (e.g., "localhost:8001")
-            model_name: Model name in Triton repository
-            model_version: Model version (default: "1")
-            checkpoint_dir: Path to local checkpoint (for local mode)
-        
-        Returns:
-            Configured inference client
+            mode: "nim" or "local". Defaults to INFERENCE_MODE env var or "local"
+            api_url: URL of the NIM wrapper (e.g. "http://nim-wrapper:8000")
         """
         mode = mode or os.getenv("INFERENCE_MODE", "local")
         
-        if mode == "triton":
-            triton_url = triton_url or os.getenv("TRITON_URL", "localhost:8001")
-            model_name = model_name or os.getenv("MODEL_NAME", "act_pick_place")
-            model_version = model_version or os.getenv("MODEL_VERSION", "1")
+        if mode == "nim":
+            api_url = api_url or os.getenv("INFERENCE_API_URL", "http://localhost:8090")
+            print(f"Initializing NIM Client connecting to {api_url}")
+            return NIMClient(url=api_url)
             
-            return TritonGRPCClient(
-                url=triton_url,
-                model_name=model_name,
-                model_version=model_version,
-            )
         elif mode == "local":
             if checkpoint_dir is None:
                 checkpoint_dir = os.getenv(
@@ -76,150 +52,71 @@ class InferenceClient(ABC):
                     "outputs/train/act_pick_place_30k/checkpoints/030000/pretrained_model"
                 )
             return LocalInferenceClient(checkpoint_dir=checkpoint_dir)
+            
         else:
-            raise ValueError(f"Unknown inference mode: {mode}. Use 'triton' or 'local'")
+            raise ValueError(f"Unknown inference mode: {mode}. Use 'nim' or 'local'")
 
 
-class TritonGRPCClient(InferenceClient):
-    """Triton Inference Server client using gRPC protocol."""
+class NIMClient(InferenceClient):
+    """
+    NIM Microservice Client.
+    Communicates via JSON/REST with the decoupled wrapper service.
+    Zero knowledge of Triton/gRPC/Tensors.
+    """
     
-    def __init__(self, url: str, model_name: str, model_version: str = "1"):
-        """
-        Initialize Triton gRPC client.
+    def __init__(self, url: str):
+        self.url = url.rstrip("/")
+        self.predict_endpoint = f"{self.url}/predict"
+        self.health_endpoint = f"{self.url}/health"
         
-        Args:
-            url: Triton server gRPC endpoint (e.g., "localhost:8001")
-            model_name: Name of model in Triton repository
-            model_version: Model version to use
-        """
+        # Verify connection
         try:
-            import tritonclient.grpc as grpcclient
-            from tritonclient.utils import np_to_triton_dtype
-        except ImportError:
-            raise ImportError(
-                "tritonclient not installed. Install with: pip install tritonclient[grpc]"
-            )
-        
-        self.url = url
-        self.model_name = model_name
-        self.model_version = model_version
-        self.grpcclient = grpcclient
-        self.np_to_triton_dtype = np_to_triton_dtype
-        
-        # Initialize client
-        self.client = grpcclient.InferenceServerClient(url=url)
-        
-        # Verify server is live
-        if not self.client.is_server_live():
-            raise ConnectionError(f"Triton server at {url} is not live")
-        
-        # Verify model is ready
-        if not self.client.is_model_ready(model_name, model_version):
-            raise ValueError(f"Model {model_name} version {model_version} is not ready")
-        
-        print(f"✓ Connected to Triton server at {url}")
-        print(f"✓ Model {model_name} (v{model_version}) is ready")
-    
-    def _preprocess_observation(
-        self, observation: Dict[str, np.ndarray]
-    ) -> Dict[str, np.ndarray]:
-        """
-        Preprocess observation for Triton inference.
-        
-        Applies ImageNet normalization to images and ensures correct shapes (8D state).
-        """
-        # State: [8] -> [1, 8]
-        state = observation["observation.state"].astype(np.float32)
-        if state.ndim == 1:
-            state = state[np.newaxis, :]
-        
-        # Image: [H, W, 3] -> [1, 3, H, W] with ImageNet normalization
-        image = observation["observation.images.top_cam"].astype(np.float32)
-        
-        # Handle format (GymEnv returns CHW, but raw images might be HWC)
-        if image.shape[0] == 3:
-            # Already CHW (3, H, W)
-            pass
-        elif image.shape[-1] == 3:
-            # HWC (H, W, 3) -> Convert to CHW
-            image = np.transpose(image, (2, 0, 1))
-        else:
-            raise ValueError(f"Expected image in CHW or HWC format, got shape {image.shape}")
-        
-        # Normalize to [0, 1]
-        image = image / 255.0
-        
-        # Apply ImageNet normalization
-        imagenet_mean = np.array([0.485, 0.456, 0.406], dtype=np.float32).reshape(3, 1, 1)
-        imagenet_std = np.array([0.229, 0.224, 0.225], dtype=np.float32).reshape(3, 1, 1)
-        image = (image - imagenet_mean) / imagenet_std
-        
-        # Add batch dimension
-        if image.ndim == 3:
-            image = image[np.newaxis, :]  # [1, 3, H, W]
-        
-        return {
-            "observation.state": state,
-            "observation.images.top_cam": image,
-        }
-    
+            with urllib.request.urlopen(self.health_endpoint) as response:
+                if response.status != 200:
+                    raise ConnectionError(f"NIM Health check failed: {response.status}")
+                print(f"✓ Connected to NIM Wrapper at {self.url}")
+        except urllib.error.URLError as e:
+            print(f"WARNING: Could not connect to NIM Wrapper at {self.url}: {e}")
+            print("Ensure the 'nim-wrapper' service is running.")
+
     def predict(self, observation: Dict[str, np.ndarray]) -> np.ndarray:
         """
-        Run inference via Triton gRPC.
-        
-        Args:
-            observation: Raw observation from environment
-        
-        Returns:
-            Unnormalized action array [14]
+        Send specific observation to NIM wrapper via generic JSON API.
         """
-        # Preprocess
-        processed = self._preprocess_observation(observation)
+        # Prepare payload
+        # 1. State: numpy -> list
+        state = observation["observation.state"].tolist()
         
-        # Create input tensors
-        inputs = []
-        inputs.append(
-            self.grpcclient.InferInput(
-                "state__0",
-                processed["observation.state"].shape,
-                self.np_to_triton_dtype(processed["observation.state"].dtype),
-            )
-        )
-        inputs[0].set_data_from_numpy(processed["observation.state"])
+        # 2. Image: numpy -> list
+        # Check format. Wrapper expects standard nested list.
+        image = observation["observation.images.top_cam"]
+        if hasattr(image, 'tolist'):
+            image = image.tolist()
+            
+        payload = {
+            "state": state,
+            "image": image
+        }
         
-        inputs.append(
-            self.grpcclient.InferInput(
-                "image__1",
-                processed["observation.images.top_cam"].shape,
-                self.np_to_triton_dtype(processed["observation.images.top_cam"].dtype),
-            )
-        )
-        inputs[1].set_data_from_numpy(processed["observation.images.top_cam"])
-        
-        # Create output placeholder
-        outputs = [self.grpcclient.InferRequestedOutput("output__0")]
-        
-        # Run inference
-        response = self.client.infer(
-            model_name=self.model_name,
-            model_version=self.model_version,
-            inputs=inputs,
-            outputs=outputs,
+        # Send Request
+        req = urllib.request.Request(
+            self.predict_endpoint,
+            data=json.dumps(payload).encode('utf-8'),
+            headers={'Content-Type': 'application/json'}
         )
         
-        # Extract action
-        action = response.as_numpy("output__0")
-        
-        # Remove batch dimension: [1, 8] -> [8]
-        if action.ndim == 2 and action.shape[0] == 1:
-            action = action[0]
-        
-        return action
-    
+        try:
+            with urllib.request.urlopen(req) as response:
+                result = json.loads(response.read().decode('utf-8'))
+                action = np.array(result["action"], dtype=np.float32)
+                return action
+        except urllib.error.HTTPError as e:
+            raise RuntimeError(f"NIM Inference failed: {e.code} {e.reason}")
+        except Exception as e:
+            raise RuntimeError(f"NIM Request failed: {str(e)}")
+
     def close(self):
-        """Close gRPC connection."""
-        if hasattr(self, "client"):
-            self.client.close()
+        pass
 
 
 class LocalInferenceClient(InferenceClient):
