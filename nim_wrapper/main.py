@@ -5,7 +5,7 @@ import tritonclient.grpc as grpcclient
 from tritonclient.utils import np_to_triton_dtype
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Any
 
 app = FastAPI(title="ACT Policy NIM Wrapper")
 
@@ -19,7 +19,7 @@ triton_client: Optional[grpcclient.InferenceServerClient] = None
 
 class ObservationRequest(BaseModel):
     state: List[float]
-    image: List[float]  # Flattened or structured, we'll assume flattened for simplicity or check structured
+    image: List[Any]    # Image is 3D [3, H, W] or [H, W, 3] -> Nested list
     # Actually, for JSON, nested lists are standard for images [H, W, 3] or [3, H, W]
 
 class ActionResponse(BaseModel):

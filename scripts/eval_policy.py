@@ -117,7 +117,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--mode",
         type=str,
-        choices=["triton", "local"],
+        choices=["triton", "local", "nim"],
         default=None,
         help="Inference mode (defaults to INFERENCE_MODE env var)"
     )
