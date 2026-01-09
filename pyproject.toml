@@ -18,6 +18,8 @@ dependencies = [
   "tqdm",
   "opencv-python",
   "pyquaternion",
+  "gymnasium>=0.29.0",
+  "lerobot",
 ]
 
 [build-system]
